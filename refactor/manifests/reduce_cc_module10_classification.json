@@ -1,6 +1,6 @@
 {
   "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
-  "target_files": [
+  "targets_files": [
     "src2/engine/module10_classification.py"
   ],
   "reference_files": [
