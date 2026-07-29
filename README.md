@@ -1,6 +1,9 @@
 # antigravity-agents (agy-agents)
 
-Standalone agentic workflows and tools that run against the [LiteRouter](https://github.com/Acivar-Digital/literouter) API Gateway using Google's Antigravity sandbox (`antigravity-preview-05-2026`).
+Standalone agentic workflows and tools that run against the [LiteRouter API Gateway](http://localhost:7766/v1beta/interactions) (`/v1beta/interactions` endpoint) using Google's Antigravity sandbox (`antigravity-preview-05-2026`).
+
+> **⚠️ Uses `/v1beta/interactions` (interaction format), NOT `/v1/chat/completions` (OpenAI format).**
+> Payload: `{"agent": "antigravity-preview-05-2026", "input": "...", "environment": "remote"}`
 
 ## Available Agents
 
