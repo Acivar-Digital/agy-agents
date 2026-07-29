@@ -13,8 +13,9 @@ LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "sk-lr-8f2a9e3b1c4d7e5f")
 GATEWAY_URL = f"http://localhost:{LITEROUTER_PORT}/v1beta/interactions"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
 MANIFESTS_DIR = SCRIPT_DIR / "manifests"
-DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "output"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "refactor" / "output"
 AGENT_NAME = "antigravity-preview-05-2026"
 
 
@@ -100,12 +101,14 @@ def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
 
     targets_raw = manifest.get("targets", [])
     output_dir = Path(manifest.get("output_dir", str(DEFAULT_OUTPUT_DIR)))
+    if not output_dir.is_absolute():
+        output_dir = PROJECT_ROOT / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     output_naming = manifest.get("output_naming", "{stem}_refactored")
 
     reference_files = []
     for rf in manifest.get("reference_files", []):
-        p = Path(rf)
+        p = PROJECT_ROOT / rf if not Path(rf).is_absolute() else Path(rf)
         if p.exists():
             reference_files.append(p)
         else:
@@ -113,7 +116,7 @@ def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
 
     results = {}
     for target_raw in targets_raw:
-        target = Path(target_raw)
+        target = PROJECT_ROOT / target_raw if not Path(target_raw).is_absolute() else Path(target_raw)
         if not target.exists():
             print(f"❌ Error: Target file not found at {target}")
             results[str(target)] = False
