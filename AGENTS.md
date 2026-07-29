@@ -26,7 +26,8 @@ An autonomous agent pipeline that reads Python files, sends them to the Antigrav
 
 **Workflow:**
 1. Ensure the LiteRouter gateway is running on port 7766.
-2. Run: `uv run python refactor/refactor.py <path>`
+2. (Optional) Edit `refactor/prompt.txt` to customize refactoring instructions.
+3. Run: `uv run python refactor/refactor.py <path>`
 3. Review the diff with `git diff`.
 4. Commit the refactored files if satisfied.
 
@@ -43,6 +44,7 @@ An autonomous agent pipeline that reads Python files, sends them to the Antigrav
 - `deep-research/deep-research.py` — Deep research execution script
 - `deep-research/run.sh` — Batch runner for research prompts
 - `deep-research/prompts/_template_guide.md` — Template for creating research prompts
+- `refactor/prompt.txt` — System prompt (editable instructions for the agent)
 - `refactor/refactor.py` — Reusable auto-refactor script
 - `refactor/INSTRUCTIONS.md` — Detailed multi-agent refactoring guide
 - `refactor/.env.example` — Environment template for refactoring

@@ -62,10 +62,11 @@ agy-agents/
 │   └── reports/                   ← Generated (gitignored)
 │       └── *.md + *_raw.json
 ├── refactor/
-│   ├── refactor.py              ← Reusable auto-refactor script
-│   ├── .env.example             ← Environment template
-│   ├── INSTRUCTIONS.md          ← Multi-agent refactoring guide
-│   └── reports/                   ← Generated (gitignored)
+│   ├── prompt.txt           ← Default system prompt (editable)
+│   ├── refactor.py          ← Reusable auto-refactor script
+│   ├── .env.example         ← Environment template
+│   ├── INSTRUCTIONS.md      ← Multi-agent refactoring guide
+│   └── reports/               ← Generated (gitignored)
 │       └── batch_report_*.md
 ├── README.md
 ├── AGENTS.md
