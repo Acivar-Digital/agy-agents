@@ -106,10 +106,15 @@ def refactor_file(input_file_path: str, prompt: str) -> str | None:
                 print("❌ Error: No output text found in API response.")
                 return None
 
+            refactored_code = refactored_code.strip()
+
             if refactored_code.startswith("```python"):
-                refactored_code = refactored_code.replace("```python\n", "", 1)
+                refactored_code = refactored_code[9:].strip()
+            elif refactored_code.startswith("```"):
+                refactored_code = refactored_code[3:].strip()
+
             if refactored_code.endswith("```"):
-                refactored_code = refactored_code.rsplit("```", 1)[0]
+                refactored_code = refactored_code[:-3].strip()
 
             output_file = target_file.with_name(
                 f"{target_file.stem}_refactored{target_file.suffix}"
@@ -134,7 +139,8 @@ def find_python_files(directory: str) -> list[Path]:
     if target_dir.is_file() and target_dir.suffix == ".py":
         return [target_dir]
     if target_dir.is_dir():
-        return sorted(target_dir.rglob("*.py"))
+        all_py_files = sorted(target_dir.rglob("*.py"))
+        return [f for f in all_py_files if not f.name.endswith("_refactored.py")]
     print(f"❌ Error: {directory} is not a Python file or directory.")
     return []
 
