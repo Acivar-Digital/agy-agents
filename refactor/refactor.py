@@ -90,7 +90,9 @@ def build_input(prompt: str, target_file: Path, reference_files: list[Path]) -> 
     return "\n".join(parts)
 
 
-def refactor_with_manifest(manifest: dict) -> dict[str, bool]:
+def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
+    if delay > 0:
+        time.sleep(delay)
     prompt = manifest.get("prompt", "")
     if not prompt:
         print("❌ Error: Manifest has no 'prompt' field.")
@@ -216,20 +218,21 @@ def generate_batch_report(results: list[dict]) -> Path:
 
 
 def main():
-    manifest_dir = str(MANIFESTS_DIR)
     manifests = load_manifests()
 
     if not manifests:
-        print("❌ Error: No manifest files found in refs/manifests/")
+        print("❌ Error: No manifest files found in refactor/manifests/")
         sys.exit(1)
 
-    print(f"Found {len(manifests)} manifest(s). Running all concurrently.\n")
+    print(f"Found {len(manifests)} manifest(s). Running all concurrently with staggered start.\n")
 
     start_time = time.time()
 
     all_results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(manifests), 20)) as executor:
-        futures = {executor.submit(refactor_with_manifest, m): m for m in manifests}
+        futures = {}
+        for i, manifest in enumerate(manifests):
+            futures[executor.submit(refactor_with_manifest, manifest, i * 2)] = manifest
         for future in concurrent.futures.as_completed(futures):
             try:
                 result = future.result()
