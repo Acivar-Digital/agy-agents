@@ -39,24 +39,27 @@ The **script** (`refactor.py`) does all filesystem work. It reads `.py` files, s
 
 The agent never places files, never reads files, never knows the file path. It only receives code as text and returns refactored code as text.
 
-## Step 0: Customize the Prompt
+## Step 0: Create Your Prompt (Modeled on prompt.txt)
 
-Before running the refactor, edit the prompt file that tells the agent how to refactor:
+Before running any refactor, create a prompt file for the task using `refactor/prompt.txt` as the template. The prompt controls what the agent does — it gets prepended to the user message and defines the agent's behavior.
 
-```
-refactor/prompt.txt
-```
-
-This file contains the **system prompt** — the instructions the agent follows when refactoring. The default prompt:
-- Modernizes code with Python features (f-strings, pathlib, dataclasses)
-- Adds comprehensive type hints and Google-style docstrings
-- Improves error handling and efficiency
-- Preserves all business logic, API signatures, and imports
-
-To use a custom prompt for a different task, create your own file and pass it with `--prompt`:
+To base your prompt on the default, copy and customize it:
 
 ```bash
-uv run python refactor/refactor.py path/to/script.py --prompt path/to/my_prompt.txt
+cp refactor/prompt.txt refactor/prompt_cc_reduce.txt
+# Edit prompt_cc_reduce.txt for your specific task
+```
+
+The default `prompt.txt` instructs the agent to:
+- Modernize code with Python features (f-strings, pathlib, dataclasses)
+- Add comprehensive type hints and Google-style docstrings
+- Improve error handling and efficiency
+- Preserve all business logic, API signatures, and imports
+
+To use your custom prompt, pass it with `--prompt`:
+
+```bash
+uv run python refactor/refactor.py path/to/script.py --prompt refactor/prompt_cc_reduce.txt
 ```
 
 ## Workflow Stages
