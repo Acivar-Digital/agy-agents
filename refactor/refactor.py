@@ -96,7 +96,7 @@ def refactor_file(input_file_path: str, prompt: str) -> str | None:
     print(f"🚀 Refactoring {target_file.name}...")
 
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             res_body = resp.read().decode("utf-8")
             res_json = json.loads(res_body)
 
