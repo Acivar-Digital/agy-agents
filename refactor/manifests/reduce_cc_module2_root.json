@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/module2_root.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor these functions in `src2/engine/module2_root.py` to reduce their CC to ≤5 each:\n1. `calculate_root` (CC 97→≤5) — root accumulation loop, medicine/taboo logic, score math\n2. `calculate_clash_adjusted_dm_score` (CC 25→≤5) — strength calculation with adjustment layers\n3. `calculate_dm_strength_tier1` (CC 23→≤5) — multi-tier DM strength assessment\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice:\n1. Flat orchestrator main function\n2. Extracted helpers use Guard Clauses (early returns)\n3. Strict Pydantic V2 schemas, no raw dict literals\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\nMain function calls pure helpers, each ≤5 CC:\n```python\ndef calculate_root(...) -> ModuleRootOutput:\n    if not stems or not branches:\n        return _empty_module_root()\n    dm_stem = stems.day or \"Unknown\"\n    dm_info = get_stem_info(dm_stem)\n    if not dm_info:\n        return _empty_module_root()\n    body = _compute_body(dm_info)\n    score = _compute_score(body)\n    medicine_score = _apply_medicine(body, medicine, taboo)\n    taboo_score = _apply_taboo(body, taboo)\n    root_data = _build_root_data(body, score, medicine_score, taboo_score)\n    return ModuleRootOutput(**root_data)\n```\n\n### Guard Clause Pattern\nEvery helper uses early returns:\n```python\ndef _compute_body(dm_info: StemInfo) -> BodyResult:\n    if dm_info.element is None:\n        return BodyResult.empty()\n    ...\n```\n\n### Tuple-of-Tuples Dispatch\nReplace nested if/else chains:\n```python\n_ELEMENT_BONUSES: tuple[tuple[str, float], ...] = (\n    (\"Wood\", 1.2), (\"Fire\", 1.1), ...\n)\n\ndef _get_element_bonus(el: str) -> float:\n    for name, bonus in _ELEMENT_BONUSES:\n        if name == el:\n            return bonus\n    return 1.0\n```\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve all existing Pydantic return types\n4. Preserve all function signatures and public API\n5. No invented Pydantic models — only use existing models from unified.py\n6. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

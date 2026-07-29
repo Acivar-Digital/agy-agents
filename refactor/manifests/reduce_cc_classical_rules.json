@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/classical_rules.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor `get_phase_modifier` in `src2/engine/classical_rules.py` to reduce its CC from 12 to ≤5.\n\nNote: `get_ge_ju_pattern` (CC 29→2) and `get_ten_god` (CC 111→1) are ALREADY DONE — do NOT modify them. They are BLACK BOX helpers.\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice the flat orchestrator + guard clause + tuple dispatch patterns.\n\n## POSITIVE BLUEPRINTS\n\n### Tuple-of-Tuples Dispatch (this is a perfect candidate)\nThis function is a mapping from phase names to float modifiers. Extract to a module-level tuple constant:\n```python\n_PHASE_MODIFIERS: tuple[tuple[str, float], ...] = (\n    (\"spring\", 1.2),\n    (\"summer\", 1.1),\n    ...\n)\n\ndef get_phase_modifier(phase: str) -> float:\n    for name, modifier in _PHASE_MODIFIERS:\n        if name == phase:\n            return modifier\n    return 0.0\n```\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function\n2. No raw dict literals for domain lookups — use tuple-of-tuples\n3. Preserve all existing Pydantic return types\n4. Preserve all function signatures\n5. No invented Pydantic models\n6. Do NOT modify get_ge_ju_pattern or get_ten_god (already done)\n7. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

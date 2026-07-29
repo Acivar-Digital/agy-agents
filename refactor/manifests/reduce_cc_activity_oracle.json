@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/activity_oracle.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor these functions in `src2/engine/activity_oracle.py` to reduce their CC to ≤5 each:\n1. `score_day` (CC ~44→≤5) — multi-activity scoring with sub-scorers\n2. `_score_study` (CC ~21→≤5) — study activity scoring\n\nThe `get_friction_constant` function (CC 1) contains a pre-existing dict literal — LOW priority, leave it.\n\n## GOLD STANDARD EXEMPLAR (this file itself)\nThis file was partially refactored before (sub-helpers extracted). Study the existing helper patterns.\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\n`score_day` should be a flat dispatcher calling per-activity helpers:\n```python\ndef score_day(day_pillar, profile, month_pillar, year_pillar) -> ActivityDayResult:\n    activities = DailyActivities()\n    activities.travel = _score_travel(day_pillar, profile, month_pillar, year_pillar)\n    activities.job_interview = _score_job_interview(day_pillar, profile, month_pillar, year_pillar)\n    activities.love = _score_love(day_pillar, profile, month_pillar, year_pillar)\n    activities.speculation = _score_speculation(day_pillar, profile, month_pillar, year_pillar)\n    activities.study = _score_study(day_pillar, profile, month_pillar, year_pillar)\n    return _build_activity_day_result(activities)\n```\n\n### Guard Clause Pattern\nEvery sub-scorer uses early returns:\n```python\ndef _score_travel(day_pillar, profile, month_pillar, year_pillar) -> ActivityScore:\n    if not day_pillar:\n        return ActivityScore(score=0, reason=\"No day pillar\", verdict=\"Average\")\n    ...\n```\n\n### Tuple-of-Tuples Dispatch\nReplace scoring chains with tuple constants:\n```python\n_ACTIVITY_WEIGHTS: tuple[tuple[str, float], ...] = (\n    (\"travel\", 0.3), (\"job_interview\", 0.2), ...\n)\n```\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve all existing Pydantic return types (ActivityDayResult, ActivityScore, etc.)\n4. Preserve all function signatures\n5. No invented Pydantic models — only use existing models from unified.py\n6. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

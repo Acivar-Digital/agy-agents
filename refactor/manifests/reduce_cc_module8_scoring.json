@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/module8_scoring.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor `calculate_composite_score` in `src2/engine/module8_scoring.py` to reduce its CC from 24 to ≤5.\n\nNote: `calculate_composite_score_adapter` (CC 1) is already simple — preserve it as a BLACK BOX.\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice the flat orchestrator + guard clause + tuple dispatch patterns.\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\nDecompose weighted scoring into per-component helpers:\n```python\ndef calculate_composite_score(dm_stem, month_branch, da_yun_stem, da_yun_branch, spectrum_tier, pattern_tier, ge_ju_ten_god_mod, interactions, medicine, taboo) -> CompositeScore:\n    base = _compute_base_score(dm_stem, month_branch, da_yun_stem, da_yun_branch)\n    spectrum = _apply_spectrum_weight(base, spectrum_tier)\n    pattern = _apply_pattern_adj(spectrum, pattern_tier)\n    ge_ju = _apply_ge_ju_modifier(pattern, ge_ju_ten_god_mod)\n    interaction = _apply_interaction_modifier(ge_ju, interactions)\n    adjusted = _apply_medicine_taboo(interaction, medicine, taboo)\n    score = round(adjusted.total, 2)\n    return CompositeScore(score=score, breakdown=adjusted)\n```\n\n### Guard Clause Pattern\nEvery helper uses early returns:\n```python\ndef _compute_base_score(dm_stem, month_branch, da_yun_stem, da_yun_branch) -> float:\n    if dm_stem == \"Unknown\" or not month_branch:\n        return 50.0\n    ...\n```\n\n### Tuple-of-Tuples Dispatch\nReplace if/elif scoring chains with tuple constants.\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve calculate_composite_score_adapter as BLACK BOX\n4. Preserve all existing Pydantic return types\n5. Preserve all function signatures\n6. No invented Pydantic models — only use existing models from unified.py\n7. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}
