@@ -1,6 +1,14 @@
 # agy-agents — Agent Instructions
 
-This repository contains standalone agentic workflows and tools designed to run against the LiteRouter API Gateway using Google's Antigravity sandbox (`antigravity-preview-05-2026`).
+This repository contains standalone agentic workflows that run against the **LiteRouter API Gateway** (`/v1beta/interactions` endpoint) using Google's Antigravity sandbox (`antigravity-preview-05-2026`).
+
+> **⚠️ DO NOT use `/v1/chat/completions` (OpenAI format).** LiteRouter uses the `/v1beta/interactions` endpoint with a different payload and response format.
+
+## Endpoint contract
+
+- **URL:** `http://localhost:7766/v1beta/interactions`
+- **Payload:** `{"agent": "antigravity-preview-05-2026", "input": "...", "environment": "remote"}`
+- **Response:** An interaction object with `object: "interaction"`, `status: "completed"`, and a `steps` array containing `thought` and `model_output` entries.
 
 ## Available Agents
 
@@ -41,11 +49,11 @@ An autonomous agent pipeline that reads Python files, sends them to the Antigrav
 
 ## Key Files
 
-- `deep-research/deep-research.py` — Deep research execution script
+- `deep-research/deep-research.py` — Deep research execution script (uses `/v1beta/interactions`)
 - `deep-research/run.sh` — Batch runner for research prompts
 - `deep-research/prompts/_template_guide.md` — Template for creating research prompts
 - `refactor/prompt.txt` — System prompt (editable instructions for the agent)
-- `refactor/refactor.py` — Reusable auto-refactor script
+- `refactor/refactor.py` — Reusable auto-refactor script (uses `/v1beta/interactions`)
 - `refactor/INSTRUCTIONS.md` — Detailed multi-agent refactoring guide
 - `refactor/.env.example` — Environment template for refactoring
 
