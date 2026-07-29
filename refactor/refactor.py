@@ -47,7 +47,7 @@ def refactor_file(input_file_path: str, system_prompt: str) -> str | None:
         "model": "antigravity-preview-05-2026",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Please refactor this file:\n\n{original_code}"},
+            {"role": "user", "content": f"Please refactor this file. The filename is `{target_file.name}`.\n\n{original_code}"},
         ],
         "temperature": 0.2,
     }
