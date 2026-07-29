@@ -56,7 +56,7 @@ def load_prompt(prompt_path: str | None) -> str:
     sys.exit(1)
 
 
-def refactor_file(input_file_path: str) -> str | None:
+def refactor_file(input_file_path: str, prompt: str) -> str | None:
     target_file = Path(input_file_path)
     if not target_file.exists():
         print(f"❌ Error: File {target_file} not found.")
@@ -70,6 +70,7 @@ def refactor_file(input_file_path: str) -> str | None:
         original_code = f.read()
 
     user_prompt = (
+        f"{prompt}\n\n"
         f"Please refactor this file. The filename is `{target_file.name}`.\n\n"
         f"{original_code}"
     )
@@ -209,9 +210,11 @@ def main():
 
     print(f"Found {len(files)} Python file(s) to refactor.\n")
 
+    system_prompt = load_prompt(args.prompt)
+
     results = []
     for f in files:
-        out = refactor_file(str(f))
+        out = refactor_file(str(f), system_prompt)
         results.append({"file": str(f), "success": out is not None, "output": out})
 
     generate_batch_report(results)
