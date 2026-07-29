@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/module3_interaction.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor `_calculate_interactions` in `src2/engine/module3_interaction.py` to reduce its CC from 59 to ≤5.\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice:\n1. Flat orchestrator main function\n2. Extracted helpers use Guard Clauses (early returns)\n3. Strict Pydantic V2 schemas, no raw dict literals\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\nMain function delegates to per-dimension helpers:\n```python\ndef _calculate_interactions(stems: PillarMap, branches: PillarMap) -> UnifiedInteractionOutput:\n    stem_items = _collect_stem_items(stems)\n    stem_interactions, stem_friction = _calc_stem_interactions(stem_items)\n    branch_items = _collect_branch_items(branches)\n    branch_interactions, branch_friction = _calc_branch_interactions(branch_items)\n    interactions = _merge_interactions(stem_interactions, branch_interactions)\n    friction = _consolidate_friction(stem_friction, branch_friction)\n    return UnifiedInteractionOutput(\n        interactions=interactions,\n        friction=friction,\n        ...\n    )\n```\n\n### Guard Clause Pattern\nEvery helper uses early returns:\n```python\ndef _collect_stem_items(stems: PillarMap) -> list[ tuple[str, str] ]:\n    if not stems:\n        return []\n    ...\n```\n\n### Tuple-of-Tuples Dispatch\nReplace nested if/else chains with tuple constants:\n```python\n_INTERACTION_MATRIX: tuple[tuple[str, str, str], ...] = (\n    (\"Resource\", \"Resource\", \"Complement\"),\n    ...\n)\n```\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve all existing Pydantic return types (UnifiedInteractionOutput)\n4. Preserve all function signatures\n5. No invented Pydantic models — only use existing models from unified.py\n6. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

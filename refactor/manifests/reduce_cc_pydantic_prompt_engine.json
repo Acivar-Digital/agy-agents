@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/pydantic_prompt_engine.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor `run_pydantic_engine` in `src2/engine/pydantic_prompt_engine.py` to reduce its CC from ~20 to ≤5.\n\nNote: `get_friction_constant` (CC 1) contains a pre-existing dict literal — LOW priority, leave it as-is.\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice the flat orchestrator + guard clause + tuple dispatch patterns.\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\n`run_pydantic_engine` delegates to per-phase async helpers:\n```python\nasync def run_pydantic_engine(profile_data, output_path=None, progress_callback=None, target_year=2026) -> EngineRunResult:\n    if not profile_data:\n        raise ValueError(\"profile_data is required\")\n    profile = _resolve_profile(profile_data)\n    await _notify_if_callback(progress_callback, \"resolving profile\")\n    chart_context = await _build_chart_context(profile, target_year)\n    await _notify_if_callback(progress_callback, \"building chart context\")\n    results = await _run_engine_passes(profile, chart_context)\n    await _notify_if_callback(progress_callback, \"running engine\")\n    report = _compile_report(results, profile)\n    if output_path:\n        await _save_report(report, output_path)\n    return report\n```\n\n### Guard Clause Pattern\nEvery helper uses early returns:\n```python\nasync def _resolve_profile(profile_data: ChartProfile | str) -> ChartProfile:\n    if isinstance(profile_data, ChartProfile):\n        return profile_data\n    if not isinstance(profile_data, str):\n        raise TypeError(f\"Expected ChartProfile or str, got {type(profile_data)}\")\n    return ChartProfile.model_validate_json(profile_data)\n```\n\n### Async Helper Decomposition\nSplit the function into async sub-helpers each doing one thing.\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve get_friction_constant as BLACK BOX\n4. Preserve all existing Pydantic return types (EngineRunResult)\n5. Preserve all function signatures\n6. No invented Pydantic models — only use existing models from unified.py\n7. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/shen_classifier.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor `classify_shen` in `src2/engine/shen_classifier.py` to reduce its CC from 14 to ≤5.\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice the flat orchestrator + guard clause + tuple dispatch patterns.\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\nDecompose shen classification into per-element helpers:\n```python\ndef classify_shen(dm_stem, spectrum_tier, user_fav=None, user_unfav=None, profile=None) -> ShenClassifierOutput:\n    if user_fav is None:\n        user_fav = []\n    if user_unfav is None:\n        user_unfav = []\n    dm_el = get_element_from_stem(dm_stem)\n    friend_el = dm_el\n    resource_el = get_resource(dm_el)\n    output_el = get_production(dm_el)\n    wealth_el = get_control(dm_el)\n    officer_el = get_officer(dm_el)\n    results = _classify_all_shen(dm_el, friend_el, resource_el, output_el, wealth_el, officer_el, user_fav, user_unfav, profile)\n    return ShenClassifierOutput(results=results, ...)\n```\n\n### Guard Clause Pattern\nEvery helper uses early returns:\n```python\ndef _classify_all_shen(dm_el, friend_el, resource_el, output_el, wealth_el, officer_el, user_fav, user_unfav, profile) -> list[ShenResult]:\n    results = []\n    if not dm_el:\n        return results\n    results.append(_is_favorable(dm_el, friend_el, resource_el, output_el, wealth_el, officer_el, user_fav, user_unfav))\n    return results\n```\n\n### Helper Decomposition\nOne helper per ten god relationship check.\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve all existing Pydantic return types (ShenClassifierOutput)\n4. Preserve all function signatures\n5. No invented Pydantic models — only use existing models from unified.py\n6. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

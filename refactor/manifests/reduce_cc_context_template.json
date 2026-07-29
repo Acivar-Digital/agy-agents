@@ -1,0 +1,13 @@
+{
+  "project_folder": "/home/yapilwsl/arthityap/baziforecaster",
+  "targets": [
+    "src2/engine/context_template.py"
+  ],
+  "reference_files": [
+    "src2/engine/activity_oracle.py",
+    "src2/core/schemas/unified.py"
+  ],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor `serialise_profile` in `src2/engine/context_template.py` to reduce its CC from 21 to ≤5.\n\nNote: `get_ge_ju_advisory_rule` (CC 23→3) is ALREADY DONE — do NOT modify it. It is a BLACK BOX helper.\n\n## GOLD STANDARD EXEMPLAR (activity_oracle.py)\nStudy `src2/engine/activity_oracle.py` — it was refactored from CC 44→5. Notice the flat orchestrator + guard clause + tuple dispatch patterns.\n\n## POSITIVE BLUEPRINTS\n\n### Flat Orchestrator Pattern\n`serialise_profile` delegates to per-field helper functions:\n```python\ndef serialise_profile(profile: ChartProfile) -> SerializedProfileContext:\n    dm_stem = _get_dm_stem(profile)\n    dm_el = _get_dm_element(profile)\n    natal = _serialise_natal_pillars(profile)\n    transit = _serialise_transit_info(profile)\n    return SerializedProfileContext(\n        dm_stem=dm_stem,\n        dm_element=dm_el,\n        natal_pillars=natal,\n        transit=transit,\n        ...\n    )\n```\n\n### Guard Clause Pattern\nEvery helper uses early returns:\n```python\ndef _get_dm_stem(profile: ChartProfile) -> str:\n    if not profile.day_pillar:\n        return \"?\"\n    return profile.day_pillar.stem or \"?\"\n```\n\n### Tuple-of-Tuples Dispatch\nReplace any if/elif element mapping chains with tuple constants.\n\n## IRONCLAD RULES\n1. CC ≤5 per helper function — split anything above\n2. No raw dict literals for domain lookups — use tuple-of-tuples or match/case\n3. Preserve get_ge_ju_advisory_rule as BLACK BOX — do NOT modify it\n4. Preserve all existing Pydantic return types (SerializedProfileContext)\n5. Preserve all function signatures\n6. No invented Pydantic models — only use existing models from unified.py\n7. Output ONLY raw Python code. No markdown fences, no prose.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}
