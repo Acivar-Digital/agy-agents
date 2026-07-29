@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 
 LITEROUTER_PORT = os.getenv("LITEROUTER_PORT", "7766")
-LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "sk-lr-8f2a9e3b1c4d7e5f")
+LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "YOUR_KEY_HERE")
 GATEWAY_URL = f"http://localhost:{LITEROUTER_PORT}/v1/chat/completions"
 
 SCRIPT_DIR = Path(__file__).resolve().parent

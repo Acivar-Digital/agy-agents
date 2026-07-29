@@ -69,4 +69,4 @@ Since this tool communicates with the LiteRouter gateway, it needs to know where
 1. Copy `.env.example` to `.env` in the root of your repository.
 2. Ensure the following variables are set:
    - `LITEROUTER_PORT` (Default: `7766`)
-   - `LITEROUTER_AUTH_KEY` (Default: `sk-lr-8f2a9e3b1c4d7e5f`)
+   - `LITEROUTER_AUTH_KEY` (Default: `YOUR_KEY_HERE`)
