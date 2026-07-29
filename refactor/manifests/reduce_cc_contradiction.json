@@ -1,0 +1,10 @@
+{
+  "targets": ["src2/engine/contradiction_resolver.py"],
+  "reference_files": [
+    "src2/engine/shared_utils.py",
+    "src2/engine/types.py"
+  ],
+  "prompt": "You are a Senior Python Engineer refactoring code to reduce cyclomatic complexity (CC).\n\n## TASK\nRefactor the provided Python file so that ALL functions have CC <= 10.\n\n## WHAT YOU MUST DO\n1. Identify major logical blocks (nested loops, conditional chains, state mutation sections)\n2. Extract each block into a private helper function (prefixed with _)\n3. Replace extracted blocks with calls to new helpers\n4. Keep the public API unchanged (function names, args, return types)\n\n## IMPORTANT CONSTRAINTS\n- Do NOT change function signatures (public or private)\n- Do NOT change return types\n- Do NOT change imports\n- Do NOT remove business logic\n- Keep ALL original helper functions unchanged\n\n## OUTPUT FORMAT\n- Output ONLY raw Python code\n- No markdown fences\n- No conversational text\n- First character must be Python code (not backticks)\n- Write the complete file from top to bottom",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}

@@ -1,5 +1,4 @@
 import argparse
-import concurrent.futures
 import json
 import os
 import sys
@@ -14,8 +13,8 @@ LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "sk-lr-8f2a9e3b1c4d7e5f")
 GATEWAY_URL = f"http://localhost:{LITEROUTER_PORT}/v1beta/interactions"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_PROMPT_FILE = SCRIPT_DIR / "prompt.txt"
-
+MANIFESTS_DIR = SCRIPT_DIR / "manifests"
+DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "output"
 AGENT_NAME = "antigravity-preview-05-2026"
 
 
@@ -43,128 +42,153 @@ def extract_output_text(res_json: dict) -> str | None:
     return None
 
 
-def load_prompt(prompt_path: str | None) -> str:
-    if prompt_path:
-        path = Path(prompt_path)
-        if not path.exists():
-            print(f"❌ Error: Prompt file not found at {path}")
-            sys.exit(1)
-        return path.read_text(encoding="utf-8").strip()
-
-    if DEFAULT_PROMPT_FILE.exists():
-        return DEFAULT_PROMPT_FILE.read_text(encoding="utf-8").strip()
-
-    print("❌ Error: No prompt file found. Create prompt.txt in the refactor/ directory.")
-    sys.exit(1)
-
-
-def load_prompt_dir(prompt_dir: str) -> dict[str, str]:
-    dir_path = Path(prompt_dir)
-    if not dir_path.is_dir():
-        print(f"❌ Error: Prompt directory not found at {dir_path}")
+def load_manifest(manifest_path: str) -> dict:
+    path = Path(manifest_path)
+    if not path.exists():
+        print(f"❌ Error: Manifest not found at {path}")
         sys.exit(1)
-    prompts = {}
-    for f in sorted(dir_path.glob("*.txt")):
-        prompts[f.stem] = f.read_text(encoding="utf-8").strip()
-    if not prompts:
-        print(f"❌ Error: No .txt prompt files found in {dir_path}")
-        sys.exit(1)
-    return prompts
-
-
-def refactor_file(input_file_path: str, prompt: str, prompt_name: str | None = None) -> str | None:
-    target_file = Path(input_file_path)
-    if not target_file.exists():
-        print(f"❌ Error: File {target_file} not found.")
-        return None
-
-    if not target_file.suffix == ".py":
-        print(f"⚠️  Skipping non-Python file: {target_file.name}")
-        return None
-
-    with open(target_file, "r", encoding="utf-8") as f:
-        original_code = f.read()
-
-    user_prompt = (
-        f"{prompt}\n\n"
-        f"Please refactor this file. The filename is `{target_file.name}`.\n\n"
-        f"{original_code}"
-    )
-
-    payload = {
-        "agent": AGENT_NAME,
-        "input": user_prompt,
-        "environment": "remote",
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LITEROUTER_KEY}",
-    }
-
-    req = urllib.request.Request(
-        GATEWAY_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-
-    print(f"🚀 Refactoring {target_file.name}...")
-    start_time = time.time()
-
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            res_body = resp.read().decode("utf-8")
-            res_json = json.loads(res_body)
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"❌ Error: Invalid JSON in {path}: {e}")
+        sys.exit(1)
 
-            refactored_code = extract_output_text(res_json)
 
-            if refactored_code is None:
-                print("❌ Error: No output text found in API response.")
-                return None
+def load_manifest_dir(manifest_dir: str) -> list[dict]:
+    dir_path = Path(manifest_dir)
+    if not dir_path.is_dir():
+        print(f"❌ Error: Manifest directory not found at {dir_path}")
+        sys.exit(1)
+    manifests = []
+    for f in sorted(dir_path.glob("*.json")):
+        if f.name == "template.json":
+            continue
+        manifests.append(load_manifest(str(f)))
+    if not manifests:
+        print(f"❌ Error: No .json manifest files found in {manifest_dir}")
+        sys.exit(1)
+    return manifests
 
-            refactored_code = refactored_code.strip()
 
-            if refactored_code.startswith("```python"):
-                refactored_code = refactored_code[9:].strip()
-            elif refactored_code.startswith("```"):
-                refactored_code = refactored_code[3:].strip()
+def build_input(prompt: str, target_file: Path, reference_files: list[Path]) -> str:
+    parts = [prompt, ""]
+    parts.append("CRITICAL: Output ONLY the raw, refactored code for the TARGET FILE. Do not output the reference files.")
+    parts.append("")
 
-            if refactored_code.endswith("```"):
-                refactored_code = refactored_code[:-3].strip()
+    for ref in reference_files:
+        if ref.exists():
+            content = ref.read_text(encoding="utf-8").strip()
+            parts.append(f"--- START OF REFERENCE FILE: {ref.name} ---")
+            parts.append(content)
+            parts.append(f"--- END OF REFERENCE FILE: {ref.name} ---")
+            parts.append("")
+        else:
+            parts.append(f"⚠️ Reference file not found: {ref}")
+            parts.append("")
 
-            output_file = target_file.with_name(
-                f"{target_file.stem}_{prompt_name}_refactored{target_file.suffix}"
-                if prompt_name
-                else f"{target_file.stem}_refactored{target_file.suffix}"
-            )
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(refactored_code.strip() + "\n")
+    target_content = target_file.read_text(encoding="utf-8").strip()
+    parts.append(f"--- START OF TARGET FILE TO REFACTOR: {target_file.name} ---")
+    parts.append(target_content)
+    parts.append(f"--- END OF TARGET FILE TO REFACTOR: {target_file.name} ---")
 
+    return "\n".join(parts)
+
+
+def refactor_with_manifest(manifest: dict) -> dict[str, bool]:
+    prompt = manifest.get("prompt", "")
+    if not prompt:
+        print("❌ Error: Manifest has no 'prompt' field.")
+        return {}
+
+    targets_raw = manifest.get("targets", [])
+    output_dir = Path(manifest.get("output_dir", str(DEFAULT_OUTPUT_DIR)))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_naming = manifest.get("output_naming", "{stem}_refactored")
+
+    reference_files = []
+    for rf in manifest.get("reference_files", []):
+        p = Path(rf)
+        if p.exists():
+            reference_files.append(p)
+        else:
+            print(f"⚠️ Reference file not found: {p}")
+
+    results = {}
+    for target_raw in targets_raw:
+        target = Path(target_raw)
+        if not target.exists():
+            print(f"❌ Error: Target file not found at {target}")
+            results[str(target)] = False
+            continue
+
+        if target.suffix != ".py":
+            print(f"⚠️ Skipping non-Python file: {target.name}")
+            results[str(target)] = False
+            continue
+
+        user_input = build_input(prompt, target, reference_files)
+
+        payload = {
+            "agent": AGENT_NAME,
+            "input": user_input,
+            "environment": "remote",
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {LITEROUTER_KEY}",
+        }
+        req = urllib.request.Request(
+            GATEWAY_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+
+        print(f"🚀 Refactoring {target.name}...")
+        start_time = time.time()
+
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                res_body = resp.read().decode("utf-8")
+                res_json = json.loads(res_body)
+
+                refactored_code = extract_output_text(res_json)
+
+                if refactored_code is None:
+                    print(f"❌ Error: No output text found for {target.name}")
+                    results[str(target)] = False
+                    continue
+
+                refactored_code = refactored_code.strip()
+                if refactored_code.startswith("```python"):
+                    refactored_code = refactored_code[9:].strip()
+                elif refactored_code.startswith("```"):
+                    refactored_code = refactored_code[3:].strip()
+                if refactored_code.endswith("```"):
+                    refactored_code = refactored_code[:-3].strip()
+
+                stem = target.stem
+                output_name = output_naming.replace("{stem}", stem)
+                output_file = output_dir / f"{output_name}{target.suffix}"
+
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(refactored_code.strip() + "\n")
+
+                elapsed = time.time() - start_time
+                print(f"✅ Saved {output_file.name} ({elapsed:.2f}s)")
+                results[str(target)] = True
+
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="ignore")
             elapsed = time.time() - start_time
-            print(f"✅ Saved refactored version to: {output_file} ({elapsed:.2f}s)")
-            return str(output_file)
+            print(f"❌ HTTP Error {e.code}: {err_body[:500]} ({elapsed:.2f}s)")
+            results[str(target)] = False
+        except Exception as e:
+            elapsed = time.time() - start_time
+            print(f"❌ Execution Error: {e} ({elapsed:.2f}s)")
+            results[str(target)] = False
 
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        elapsed = time.time() - start_time
-        print(f"❌ HTTP Error {e.code}: {err_body[:500]} ({elapsed:.2f}s)")
-    except Exception as e:
-        elapsed = time.time() - start_time
-        print(f"❌ Execution Error: {e} ({elapsed:.2f}s)")
-
-    return None
-
-
-def find_python_files(directory: str) -> list[Path]:
-    target_dir = Path(directory)
-    if target_dir.is_file() and target_dir.suffix == ".py":
-        return [target_dir]
-    if target_dir.is_dir():
-        all_py_files = sorted(target_dir.rglob("*.py"))
-        return [f for f in all_py_files if not f.name.endswith("_refactored.py")]
-    print(f"❌ Error: {directory} is not a Python file or directory.")
-    return []
+    return results
 
 
 def generate_batch_report(results: list[dict]) -> Path:
@@ -197,21 +221,17 @@ def generate_batch_report(results: list[dict]) -> Path:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Auto-refactor Python files using antigravity sandbox agent."
+        description="Manifest-driven auto-refactor using antigravity sandbox agent."
     )
     parser.add_argument(
-        "target",
-        help="Path to a Python file or directory of Python files to refactor",
+        "--manifest",
+        metavar="FILE",
+        help="Path to a single JSON manifest file",
     )
     parser.add_argument(
-        "--prompt-dir",
+        "--manifest-dir",
         metavar="DIR",
-        help="Directory of prompt files to apply to each target file in parallel",
-    )
-    parser.add_argument(
-        "--parallel",
-        action="store_true",
-        help="Run prompt-dir refactors concurrently (requires --prompt-dir)",
+        help="Directory of JSON manifest files (auto-discovered)",
     )
     parser.add_argument(
         "--transform",
@@ -220,13 +240,17 @@ def main():
     )
     args = parser.parse_args()
 
+    if not args.manifest and not args.manifest_dir:
+        parser.print_help()
+        print("\n❌ Error: Provide --manifest FILE or --manifest-dir DIR")
+        sys.exit(1)
+
     if args.transform:
-        raw_json_file = Path(args.target)
+        raw_json_file = Path(args.manifest or args.manifest_dir)
         if not raw_json_file.exists():
             print(f"❌ Error: File not found at {raw_json_file}")
             sys.exit(1)
         res_json = json.loads(raw_json_file.read_text(encoding="utf-8"))
-
         code = extract_output_text(res_json)
         if code:
             print(code)
@@ -234,81 +258,36 @@ def main():
             print("No content found in response JSON.")
         sys.exit(0)
 
-    target = args.target
-    files = find_python_files(target)
+    all_results = {}
 
-    if not files:
-        print(f"⚠️  No Python files found in {target}")
-        sys.exit(1)
+    if args.manifest:
+        manifest = load_manifest(args.manifest)
+        all_results.update(refactor_with_manifest(manifest))
 
-    print(f"Found {len(files)} Python file(s) to refactor.\n")
+    if args.manifest_dir:
+        manifests = load_manifest_dir(args.manifest_dir)
+        for manifest in manifests:
+            all_results.update(refactor_with_manifest(manifest))
 
-    if args.prompt_dir:
-        prompts = load_prompt_dir(args.prompt_dir)
-        print(f"Loaded {len(prompts)} prompt(s) from {args.prompt_dir}.")
+    results_list = [
+        {"file": k, "success": v, "output": str(v)} for k, v in all_results.items()
+    ]
 
-        tasks = []
-        for f in files:
-            for prompt_name, prompt_text in prompts.items():
-                tasks.append((str(f), prompt_text, prompt_name))
+    successes = sum(1 for v in all_results.values() if v)
+    failures = sum(1 for v in all_results.values() if not v)
+    total = len(all_results)
 
-        print(f"Running {len(tasks)} refactor task(s).\n")
+    print(f"\n{'='*40}")
+    print(f"Refactor complete: {successes} succeeded, {failures} failed ({total} total)")
+    print(f"{'='*40}")
 
-        if args.parallel:
-            max_workers = min(len(tasks), 10)
-            print(f"Parallel mode: {max_workers} worker(s)\n")
-            results = []
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(refactor_file, f, p, n): (f, n)
-                    for f, p, n in tasks
-                }
-                for future in concurrent.futures.as_completed(futures):
-                    f_path, p_name = futures[future]
-                    out = future.result()
-                    results.append({"file": f_path, "prompt": p_name, "success": out is not None, "output": out})
-        else:
-            results = []
-            for f_path, p_text, p_name in tasks:
-                out = refactor_file(f_path, p_text, prompt_name=p_name)
-                results.append({"file": f_path, "prompt": p_name, "success": out is not None, "output": out})
-
-        generate_batch_report(results)
-
-        successes = sum(1 for r in results if r["success"])
-        failures = sum(1 for r in results if not r["success"])
-        total = len(results)
-
-        if failures == 0:
-            print(f"\n✅ All {total} task(s) refactored successfully.")
-            sys.exit(0)
-        elif successes == 0:
-            print(f"\n❌ All {total} task(s) failed.")
-            sys.exit(1)
-        else:
-            print(f"\n⚠️  {successes} succeeded, {failures} failed.")
-            sys.exit(1)
-
-    system_prompt = load_prompt(args.prompt)
-
-    results = []
-    for f in files:
-        out = refactor_file(str(f), system_prompt)
-        results.append({"file": str(f), "success": out is not None, "output": out})
-
-    generate_batch_report(results)
-
-    successes = sum(1 for r in results if r["success"])
-    failures = sum(1 for r in results if not r["success"])
+    generate_batch_report(results_list)
 
     if failures == 0:
-        print(f"\n✅ All {len(results)} file(s) refactored successfully.")
         sys.exit(0)
     elif successes == 0:
-        print(f"\n❌ All {len(results)} file(s) failed.")
         sys.exit(1)
     else:
-        print(f"\n⚠️  {successes} succeeded, {failures} failed.")
         sys.exit(1)
 
 
