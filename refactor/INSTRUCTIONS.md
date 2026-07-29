@@ -4,7 +4,7 @@ This document explains how AI agents refactor Python code using manifest JSON co
 
 ## Core Concept
 
-You create a **JSON manifest file** that describes one refactoring task. The script reads the manifest, reads the target and reference files from disk, builds a single text prompt, sends it to the Antigravity agent, and writes the result back to disk.
+You create a **JSON manifest file** in `refactor/manifests/` that describes one refactoring task. The script auto-discovers all JSON files in that folder and runs them. No flags, no arguments — just place the JSON file and run the script.
 
 **You never call the API directly.** The script handles all API communication, file I/O, and error handling.
 
@@ -21,13 +21,13 @@ You create a **JSON manifest file** that describes one refactoring task. The scr
 
 ## Manifest Format
 
-Each manifest is a JSON file stored in `refactor/manifests/`. Here is the template:
+Each manifest is a JSON file in `refactor/manifests/`. There is no template — just create a `.json` file and fill it in.
 
 ```json
 {
-  "targets": ["path/to/file.py"],
-  "reference_files": ["path/to/lib.py"],
-  "prompt": "Your full prompt text here...",
+  "targets": ["src2/engine/contradiction_resolver.py"],
+  "reference_files": ["src2/engine/shared_utils.py"],
+  "prompt": "You are a Senior Python Engineer...\n\n## TASK\n...your instructions here...\n\n## OUTPUT FORMAT\nOutput ONLY raw Python code.",
   "output_dir": "refactor/output",
   "output_naming": "{stem}_refactored"
 }
@@ -45,7 +45,7 @@ Each manifest is a JSON file stored in `refactor/manifests/`. Here is the templa
 
 ### Multiple Targets
 
-You can refactor multiple files with the same prompt in one manifest:
+Refactor multiple files with the same prompt in one manifest:
 ```json
 {
   "targets": ["src/engine/a.py", "src/engine/b.py"],
@@ -71,32 +71,31 @@ If a reference file doesn't exist on disk, the script prints a warning but conti
 7. **Write result** — saves the refactored code to `output_dir/{stem}_refactored.py` (or custom name)
 8. **Generate report** — appends result to `refactor/reports/batch_report_*.md`
 
-## How to Use It
+A 2-second stagger between concurrent executions prevents API rate-limiting.
 
-### Step 1: Create a Manifest
+## Workflow: How to Use It
 
-Copy the template and fill it in:
-```bash
-cp refactor/manifests/template.json refactor/manifests/my_task.json
+### Step 1: Create a Manifest File
+
+Create a new file in `refactor/manifests/`, e.g.:
+```
+refactor/manifests/my_task.json
 ```
 
-Edit `my_task.json`:
+Fill it with the JSON structure above:
 - Set `targets` to the files you want to refactor
 - Write your `prompt` with the specific instructions
 - Add `reference_files` if the code depends on external modules
 - Set `output_dir` and `output_naming` as needed
 
-### Step 2: Run the Script
+### Step 2: Run
 
-Process a single manifest:
+No flags needed. Just run the script from the project root:
 ```bash
-uv run python refactor/refactor.py --manifest refactor/manifests/my_task.json
+uv run python refactor/refactor.py
 ```
 
-Process all manifests in the folder (auto-discovered):
-```bash
-uv run python refactor/refactor.py --manifest-dir refactor/manifests/
-```
+The script auto-finds every `.json` file in `refactor/manifests/` (except `template.json`), builds the prompt for each, and runs them all concurrently with a 2-second stagger.
 
 ### Step 3: Review the Results
 
@@ -116,6 +115,18 @@ Your `prompt` field should contain the full system instructions for the agent. F
 4. **Specify the output format** — always include "Output ONLY raw Python code. No markdown fences."
 5. **Include reference file awareness** — mention which reference files exist so the agent doesn't try to modify them
 6. **No placeholders** — the agent must output the entire file, not fragments or `# ... rest of code ...`
+
+## Why No Flags?
+
+The entire refactoring workflow is driven by manifest files. You just place your JSON in `refactor/manifests/` and run the script. Everything else is automatic:
+- File discovery (all `.json` manifests)
+- File reading (targets + reference files)
+- Prompt building (stitching prompt + references + target)
+- API communication (`/v1beta/interactions`)
+- Output writing (`output_dir`)
+- Reporting (`refactor/reports/`)
+
+No arguments to remember, no flag combinations to manage.
 
 ## Safety Rules for Agents
 
@@ -141,12 +152,10 @@ After the script finishes, you must do these yourself:
 ```
 refactor/
 ├── INSTRUCTIONS.md         ← This file
-├── refactor.py             ← Core script (manifest-driven)
-├── prompt.txt              ← Default system prompt (legacy, not used in manifest mode)
-├── run.sh                  ← Convenience runner (--manifest-dir)
-├── manifests/
-│   ├── template.json       ← Copy this to start a new task
-│   └── *.json              ← Your manifest files (auto-discovered)
-├── output/                 ← Generated refactored files (from manifest runs)
-└── reports/                ← Batch reports (gitignored)
+├── refactor.py              ← Core script (auto-discovers manifests)
+├── run.sh                   ← Convenience runner
+├── manifests/               ← JSON manifest files (one per task)
+│   └── *.json               ← Auto-discovered, processed concurrently
+├── output/                  ← Generated refactored files (from manifest runs)
+└── reports/                 ← Batch reports (gitignored)
 ```
