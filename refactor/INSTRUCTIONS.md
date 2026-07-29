@@ -64,11 +64,20 @@ uv run python refactor/refactor.py path/to/script.py --prompt refactor/prompt_cc
 
 ## Workflow Stages
 
-1. **Ingest** — Script reads target files or directories
-2. **Analyze** — Agent identifies code smells and refactoring opportunities
-3. **Refactor** — Agent returns clean, refactored Python code as text
-4. **Write** — Script writes the returned text to a new file
-5. **Verify** — Diff the changes with `git diff`, run tests, confirm correctness
+### Running the Refactor Script
+
+```bash
+uv run python refactor/refactor.py path/to/script.py
+```
+
+The script does all the work: reads the file, sends it to the Antigravity agent via `/v1beta/interactions`, receives refactored code, writes it to disk, and generates a batch report.
+
+### What to Do After the Script Finishes
+
+1. **Show the batch report** — read `refactor/reports/batch_report_*.md` and present the summary to the user
+2. **Show the diff** — run `git diff` to display all changes made by the refactor
+3. **Present the refactored code** — read each `_refactored.py` file and show the user the refactored output
+4. **Wait for approval** — do not commit until the user confirms they are satisfied with the changes
 
 ## Best Practices (Grounded in Recent Workflows)
 
