@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "🚀 Running all manifests from refactor/manifests/"
 echo "   Mode: concurrent"
-echo "   Timeout: 300s per manifest"
+echo "   Timeout: 600s per manifest"
 echo ""
 
 uv run python "$SCRIPT_DIR/refactor.py"
