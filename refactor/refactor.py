@@ -99,6 +99,10 @@ def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
         print("❌ Error: Manifest has no 'prompt' field.")
         return {}
 
+    project_folder = Path(manifest.get("project_folder", str(PROJECT_ROOT)))
+    if not project_folder.is_absolute():
+        project_folder = PROJECT_ROOT / project_folder
+
     targets_raw = manifest.get("targets", [])
     output_dir = Path(manifest.get("output_dir", str(DEFAULT_OUTPUT_DIR)))
     if not output_dir.is_absolute():
@@ -108,7 +112,7 @@ def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
 
     reference_files = []
     for rf in manifest.get("reference_files", []):
-        p = PROJECT_ROOT / rf if not Path(rf).is_absolute() else Path(rf)
+        p = project_folder / rf if not Path(rf).is_absolute() else Path(rf)
         if p.exists():
             reference_files.append(p)
         else:
@@ -116,7 +120,7 @@ def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
 
     results = {}
     for target_raw in targets_raw:
-        target = PROJECT_ROOT / target_raw if not Path(target_raw).is_absolute() else Path(target_raw)
+        target = project_folder / target_raw if not Path(target_raw).is_absolute() else Path(target_raw)
         if not target.exists():
             print(f"❌ Error: Target file not found at {target}")
             results[str(target)] = False
