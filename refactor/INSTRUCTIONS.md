@@ -37,10 +37,11 @@ Each manifest is a JSON file in `refactor/manifests/`. There is no template — 
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `targets` | `string[]` | Yes | List of `.py` files to refactor |
-| `reference_files` | `string[]` | No | Extra files injected as read-only context |
+| `project_folder` | `string` | No | Root directory of the project to refactor. Targets and refs resolve relative to this. Defaults to the repo root (`agy-agents/`). Use absolute paths for other projects. |
+| `targets` | `string[]` | Yes | List of `.py` files to refactor (relative to `project_folder` or absolute paths) |
+| `reference_files` | `string[]` | No | Extra files injected as read-only context (relative to `project_folder`) |
 | `prompt` | `string` | Yes | The full prompt text the agent follows |
-| `output_dir` | `string` | No | Directory for `_refactored.py` files (default: `refactor/output`) |
+| `output_dir` | `string` | No | Directory for `_refactored.py` files (relative to repo root, default: `refactor/output`) |
 | `output_naming` | `string` | No | Output filename pattern; `{stem}` is replaced with the source filename stem (default: `{stem}_refactored`) |
 
 ### Multiple Targets
@@ -71,7 +72,7 @@ If a reference file doesn't exist on disk, the script prints a warning but conti
 7. **Write result** — saves the refactored code to `output_dir/{stem}_refactored.py` (or custom name)
 8. **Generate report** — appends result to `refactor/reports/batch_report_*.md`
 
-A 2-second stagger between concurrent executions prevents API rate-limiting.
+A 2-second stagger between concurrent executions prevents API rate-limiting. The script resolves all paths relative to `project_folder` if set, otherwise the repo root.
 
 ## Workflow: How to Use It
 
