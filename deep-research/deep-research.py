@@ -23,7 +23,7 @@ PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 LITEROUTER_PORT = os.getenv("LITEROUTER_PORT", "7766")
-LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "REDACTED")
+LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "YOUR_KEY_HERE")
 GATEWAY_URL = f"http://localhost:{LITEROUTER_PORT}/v1beta/interactions"
 
 

@@ -192,4 +192,4 @@ agy-agents/
 | Variable | Default | Description |
 |---|---|---|
 | `LITEROUTER_PORT` | `7766` | Port of the LiteRouter gateway |
-| `LITEROUTER_AUTH_KEY` | `REDACTED` | Bearer token for LiteRouter auth |
+| `LITEROUTER_AUTH_KEY` | `YOUR_KEY_HERE` | Bearer token for LiteRouter auth |
