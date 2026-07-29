@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -94,6 +95,7 @@ def refactor_file(input_file_path: str, prompt: str) -> str | None:
     )
 
     print(f"🚀 Refactoring {target_file.name}...")
+    start_time = time.time()
 
     try:
         with urllib.request.urlopen(req, timeout=300) as resp:
@@ -122,14 +124,17 @@ def refactor_file(input_file_path: str, prompt: str) -> str | None:
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(refactored_code.strip() + "\n")
 
-            print(f"✅ Saved refactored version to: {output_file}")
+            elapsed = time.time() - start_time
+            print(f"✅ Saved refactored version to: {output_file} ({elapsed:.2f}s)")
             return str(output_file)
 
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"❌ HTTP Error {e.code}: {err_body[:500]}")
+        elapsed = time.time() - start_time
+        print(f"❌ HTTP Error {e.code}: {err_body[:500]} ({elapsed:.2f}s)")
     except Exception as e:
-        print(f"❌ Execution Error: {e}")
+        elapsed = time.time() - start_time
+        print(f"❌ Execution Error: {e} ({elapsed:.2f}s)")
 
     return None
 
