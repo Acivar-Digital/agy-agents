@@ -39,12 +39,11 @@ Before running the refactor, edit the prompt file that tells the agent how to re
 refactor/prompt.txt
 ```
 
-This file contains the **system prompt** — the instructions the agent follows when refactoring. The default prompt tells the agent to:
-- Enforce PEP 8 compliance and clean architecture
-- Add type hints and docstrings
-- Optimize loops and logic
-- Preserve all existing functionality
-- Output **only raw code** (no markdown blocks or conversational text)
+This file contains the **system prompt** — the instructions the agent follows when refactoring. The default prompt:
+- Modernizes code with Python features (f-strings, pathlib, dataclasses)
+- Adds comprehensive type hints and Google-style docstrings
+- Improves error handling and efficiency
+- Preserves all business logic, API signatures, and imports
 
 To use a custom prompt for a different task, create your own file and pass it with `--prompt`:
 
@@ -94,6 +93,7 @@ uv run python refactor/refactor.py path/to/messy_script.py
 
 This will:
 - Read the system prompt from `refactor/prompt.txt` (or use `--prompt` for a custom one)
+- Include the filename in the user prompt (e.g., `auth.py`) so the agent understands context
 - Read `messy_script.py` from disk
 - Send it to the agent via the LiteRouter API
 - Receive back refactored Python code as text

@@ -102,7 +102,7 @@ cp refactor/.env.example refactor/.env
 uv run python refactor/refactor.py path/to/script.py
 ```
 
-This reads the system prompt from `refactor/prompt.txt` (editable to customize refactoring instructions), sends the file to the Antigravity agent, and saves the refactored version as `script_refactored.py` in the same directory.
+This reads the system prompt from `refactor/prompt.txt` (editable to customize refactoring instructions), passes the filename to the agent for context, sends the file content to the Antigravity agent, and saves the refactored version as `script_refactored.py` in the same directory.
 
 To use a custom prompt file:
 
