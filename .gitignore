@@ -3,6 +3,7 @@
 
 # Generated reports
 deep-research/reports/
+refactor/reports/
 
 # Python
 __pycache__/
