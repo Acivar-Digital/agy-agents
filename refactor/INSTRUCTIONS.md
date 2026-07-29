@@ -1,6 +1,14 @@
-# Multi-Agent Refactoring Instructions
+# Manifest-Driven Refactoring Instructions
 
-## Endpoint Contract (Critical — Read First)
+This document explains how AI agents refactor Python code using manifest JSON config files and the LiteRouter API Gateway.
+
+## Core Concept
+
+You create a **JSON manifest file** that describes one refactoring task. The script reads the manifest, reads the target and reference files from disk, builds a single text prompt, sends it to the Antigravity agent, and writes the result back to disk.
+
+**You never call the API directly.** The script handles all API communication, file I/O, and error handling.
+
+## Endpoint Contract (Critical)
 
 | Field | Value |
 |---|---|
@@ -9,164 +17,136 @@
 | **Agent** | `antigravity-preview-05-2026` |
 | **Environment** | `remote` |
 
-**Payload format:**
+> **⚠️ This uses `/v1beta/interactions` — NOT `/v1/chat/completions`.** The payload format is `{agent, input, environment}` where `input` is a single string. The response is an interaction object with `steps`, not a `choices` array.
+
+## Manifest Format
+
+Each manifest is a JSON file stored in `refactor/manifests/`. Here is the template:
+
 ```json
 {
-  "agent": "antigravity-preview-05-2026",
-  "input": "<prompt + filename + code>",
-  "environment": "remote"
+  "targets": ["path/to/file.py"],
+  "reference_files": ["path/to/lib.py"],
+  "prompt": "Your full prompt text here...",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
 }
 ```
 
-**Response format:** An interaction object with `object: "interaction"`, `status: "completed"`, and a `steps` array containing `thought` and `model_output` entries. Extract the refactored code from `steps[].content` entries where `type == "model_output"`.
+### Field Reference
 
-> **⚠️ This uses `/v1beta/interactions` — NOT `/v1/chat/completions`.** The interaction endpoint has a completely different request/response format than OpenAI chat completions. The payload uses `{agent, input, environment}` (not `messages`/`model`), and the response uses `steps` (not `choices`). Do not attempt to use the OpenAI chat completions format with this API.
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `targets` | `string[]` | Yes | List of `.py` files to refactor |
+| `reference_files` | `string[]` | No | Extra files injected as read-only context |
+| `prompt` | `string` | Yes | The full prompt text the agent follows |
+| `output_dir` | `string` | No | Directory for `_refactored.py` files (default: `refactor/output`) |
+| `output_naming` | `string` | No | Output filename pattern; `{stem}` is replaced with the source filename stem (default: `{stem}_refactored`) |
 
-This document explains how AI agents autonomously refactor code using the LiteRouter API Gateway and Antigravity sandbox.
+### Multiple Targets
 
-## How It Works
-
-The **script** (`refactor.py`) does all filesystem work. It reads `.py` files, sends code to the LiteRouter API, and writes refactored output. The **agent** (Antigravity) only returns text — never touches disk.
-
-### Pipeline
-
-1. **Ingest** — Script reads your `.py` file from disk
-2. **Send** — Script POSTs to `/v1beta/interactions` with the interaction payload (see Endpoint Contract above)
-3. **Agent** — Antigravity refactors the code and returns it as text via `steps[].model_output`
-4. **Extract** — Script pulls the refactored code from the response
-5. **Write** — Script writes the result to `original_name_refactored.py`
-6. **Report** — Script generates a `refactor/reports/batch_report_*.md`
-
-The agent never places files, never reads files, never knows the file path. It only receives code as text and returns refactored code as text.
-
-## Step 0: Create Your Prompt (Modeled on prompt.txt)
-
-Before running any refactor, create a prompt file for the task using `refactor/prompt.txt` as the template. The prompt controls what the agent does — it gets prepended to the user message and defines the agent's behavior.
-
-To base your prompt on the default, copy and customize it:
-
-```bash
-cp refactor/prompt.txt refactor/prompt_cc_reduce.txt
-# Edit prompt_cc_reduce.txt for your specific task
+You can refactor multiple files with the same prompt in one manifest:
+```json
+{
+  "targets": ["src/engine/a.py", "src/engine/b.py"],
+  "prompt": "...",
+  "output_dir": "refactor/output"
+}
 ```
 
-The default `prompt.txt` instructs the agent to:
-- Modernize code with Python features (f-strings, pathlib, dataclasses)
-- Add comprehensive type hints and Google-style docstrings
-- Improve error handling and efficiency
-- Preserve all business logic, API signatures, and imports
+### Reference Files
 
-To use your custom prompt, pass it with `--prompt`:
+Reference files are read by the script and injected into the prompt with clear boundaries (`--- START OF REFERENCE FILE ---` / `--- END OF REFERENCE FILE ---`). The agent sees them as read-only context — it should never modify them.
 
+If a reference file doesn't exist on disk, the script prints a warning but continues.
+
+## How the Script Processes a Manifest
+
+1. **Read manifest** — loads the JSON config
+2. **Read target files** — reads each `.py` file into a string
+3. **Read reference files** — reads each reference file into a string
+4. **Build prompt** — concatenates `prompt + reference files + target file` with clear markers
+5. **Send to API** — POSTs to `/v1beta/interactions` with `{agent, input, environment}`
+6. **Extract output** — parses the interaction response using `extract_output_text()`
+7. **Write result** — saves the refactored code to `output_dir/{stem}_refactored.py` (or custom name)
+8. **Generate report** — appends result to `refactor/reports/batch_report_*.md`
+
+## How to Use It
+
+### Step 1: Create a Manifest
+
+Copy the template and fill it in:
 ```bash
-uv run python refactor/refactor.py path/to/script.py --prompt refactor/prompt_cc_reduce.txt
+cp refactor/manifests/template.json refactor/manifests/my_task.json
 ```
 
-## Workflow Stages
+Edit `my_task.json`:
+- Set `targets` to the files you want to refactor
+- Write your `prompt` with the specific instructions
+- Add `reference_files` if the code depends on external modules
+- Set `output_dir` and `output_naming` as needed
 
-### Running the Refactor Script
+### Step 2: Run the Script
 
+Process a single manifest:
 ```bash
-uv run python refactor/refactor.py path/to/script.py
+uv run python refactor/refactor.py --manifest refactor/manifests/my_task.json
 ```
 
-The script does all the work: reads the file, sends it to the Antigravity agent via `/v1beta/interactions`, receives refactored code, writes it to disk, and generates a batch report.
-
-### What to Do After the Script Finishes
-
-1. **Show the batch report** — read `refactor/reports/batch_report_*.md` and present the summary to the user
-2. **Show the diff** — run `git diff` to display all changes made by the refactor
-3. **Present the refactored code** — read each `_refactored.py` file and show the user the refactored output
-4. **Wait for approval** — do not commit until the user confirms they are satisfied with the changes
-
-## Best Practices (Grounded in Recent Workflows)
-
-### 1. Start Small — File-by-File
-Do not send a large codebase in a single prompt. Read individual files, refactor them, and write them back. This keeps the context window tight and reduces hallucinations.
-
-### 2. Force Strict Raw Code Output
-By default, AI models wrap code in Markdown blocks or add conversational text. Your prompt must explicitly instruct the agent to output **only raw code** so the script can write it directly to a file. The system prompt in `refactor.py` enforces this, and a safety net strips any stray ` ```python ` fences from the response (lines 71–74).
-
-### 3. Keep Context Tightly Scoped
-If the file depends on external modules or shared utilities, include a brief summary of those dependencies in the prompt so the agent doesn't hallucinate missing functions.
-
-### 4. Use Git as a Safety Net
-Always run the refactoring script on files that are committed to Git. After the agent finishes, use `git diff` to review changes before committing them.
-
-### 5. Low Temperature for Code
-Set `temperature` to `0.2` or lower for coding tasks. This reduces random variation and keeps refactoring suggestions accurate.
-
-## How to Use the Template
-
-### Prerequisites
-
-1. LiteRouter gateway running on port 7766
-2. Antigravity sandbox access (`antigravity-preview-05-2026`)
-3. Python 3.10+ with `uv`
-4. Environment configured: `cp refactor/.env.example refactor/.env`
-
-### Running a Single File
-
+Process all manifests in the folder (auto-discovered):
 ```bash
-uv run python refactor/refactor.py path/to/messy_script.py
+uv run python refactor/refactor.py --manifest-dir refactor/manifests/
 ```
 
-This will:
-- Read the system prompt from `refactor/prompt.txt` (or use `--prompt` for a custom one)
-- Include the filename in the user prompt (e.g., `auth.py`) so the agent understands context
-- Read `messy_script.py` from disk
-- Send it to the agent via the LiteRouter API
-- Receive back refactored Python code as text
-- Save the result as `messy_script_refactored.py` in the same directory
-- Print a summary
+### Step 3: Review the Results
 
-To use a custom prompt file instead of the default `prompt.txt`:
+After the script finishes:
+1. **Check the output** — refactored files are in `refactor/output/` (or your custom `output_dir`)
+2. **Show the diff** — run `git diff` to see all changes
+3. **Verify with tests** — run `uv run ruff check --select C901` and `uv run pytest`
+4. **Review the report** — `refactor/reports/batch_report_*.md` summarizes all results
 
-```bash
-uv run python refactor/refactor.py path/to/script.py --prompt path/to/custom_prompt.txt
-```
+## Writing Effective Prompts
 
-### Running a Directory (Batch)
+Your `prompt` field should contain the full system instructions for the agent. Follow these rules:
 
-```bash
-uv run python refactor/refactor.py path/to/src/
-```
-
-This will:
-- Traverse all `.py` files in the directory recursively
-- Refactor each file individually via the API
-- Save refactored versions alongside originals (`_refactored.py`)
-- Generate a `refactor/reports/batch_report_*.md` summarizing all changes
-
-### Offline Transform Mode
-
-If you have previously saved raw API responses and want to extract the code without hitting the API again:
-
-```bash
-uv run python refactor/refactor.py --transform refactor/reports/some_run_raw.json
-```
-
-This prints the extracted code to stdout (no file is written — useful for piping or inspection).
+1. **Start with a role** — e.g., "You are a Senior Python Engineer"
+2. **State the task clearly** — what to change and what constraints to follow
+3. **Preserve the API** — if you don't want signature changes, say so explicitly
+4. **Specify the output format** — always include "Output ONLY raw Python code. No markdown fences."
+5. **Include reference file awareness** — mention which reference files exist so the agent doesn't try to modify them
+6. **No placeholders** — the agent must output the entire file, not fragments or `# ... rest of code ...`
 
 ## Safety Rules for Agents
 
-When a user asks to "refactor code" or "improve code quality":
+When creating or running a manifest:
 
-1. **You are an agent, not a file operator** — you only return text. The Python script handles all filesystem operations (reading input files, writing output files). Do not attempt to open, read, or write files directly.
-2. **Output only raw code** — do not wrap code in markdown blocks (no ` ```python `). Do not include any conversational text, explanations, or pleasantries. The output must be immediately executable Python.
-3. **Verify your output is valid Python** — check for syntax errors and missing imports before returning code.
-4. **Never delete required logic** — only restructure, rename, and add type hints.
-5. **The human reviews the diff** — after the script writes `_refactored.py` files, the user runs `git diff` to see all changes before committing.
-6. **Run tests if available** — if `pytest` or `unittest` is present, run the relevant tests on the refactored files and fix any failures before finalizing.
+1. **You are an agent, not a file operator** — you create the manifest JSON and run the script. The script reads files, calls the API, and writes output. You never touch `.py` files directly in this workflow.
+2. **Verify the manifest is valid JSON** — before running, run `python3 -c "import json; json.load(open('my_manifest.json'))"` to check for syntax errors
+3. **Check output after completion** — always review `git diff` before committing
+4. **Run tests** — if `pytest` is present, run the relevant tests and fix any failures before finalizing
+
+## Post-Run Steps
+
+After the script finishes, you must do these yourself:
+
+1. **Read the batch report** — check `refactor/reports/batch_report_*.md` for success/failure counts
+2. **Review the diff** — run `git diff` to see exactly what changed
+3. **Verify refactored files** — check that `_refactored.py` files are valid Python
+4. **Run verification commands** — `uv run ruff check --select C901` and `uv run pytest`
+5. **Commit if satisfied** — only commit after reviewing `git diff`
 
 ## Project Structure
 
 ```
 refactor/
-├── INSTRUCTIONS.md    ← This file
-├── .env.example       ← Environment template
-├── prompt.txt         ← Default system prompt for the agent (editable)
-├── refactor.py        ← Reusable refactoring script (handles all I/O)
-└── reports/           ← Generated (gitignored)
-    └── batch_report_*.md
+├── INSTRUCTIONS.md         ← This file
+├── refactor.py             ← Core script (manifest-driven)
+├── prompt.txt              ← Default system prompt (legacy, not used in manifest mode)
+├── run.sh                  ← Convenience runner (--manifest-dir)
+├── manifests/
+│   ├── template.json       ← Copy this to start a new task
+│   └── *.json              ← Your manifest files (auto-discovered)
+├── output/                 ← Generated refactored files (from manifest runs)
+└── reports/                ← Batch reports (gitignored)
 ```
