@@ -6,12 +6,8 @@
 # Best used for scheduling weekly cron jobs.
 #
 # Usage:
-#   ./research/run.sh
+#   ./deep-research/run.sh
 # ==============================================================================
-
-set -e # Exit immediately if any command fails
-
-# Get the directory of this script, then the root directory
 RESEARCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 ROOT_DIR="$(dirname "$RESEARCH_DIR")"
 
@@ -36,8 +32,8 @@ for PROMPT in "${PROMPTS[@]}"; do
     echo "----------------------------------------"
     
     # We use uv run for standard dependency management
-    uv run python research/deep-research.py "$PROMPT"
+    uv run python deep-research/deep-research.py "$PROMPT"
 done
 
 echo ""
-echo "✅ Batch Deep Research complete! Check the research/reports directory."
+echo "✅ Batch Deep Research complete! Check the deep-research/reports directory."
