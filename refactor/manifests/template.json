@@ -1,0 +1,7 @@
+{
+  "targets": ["path/to/file.py"],
+  "reference_files": [],
+  "prompt": "You are a Staff-Level Python Engineer refactoring code.\n\n## TASK\n... your prompt here ...\n\n## IMPORTANT CONSTRAINTS\n...",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}
