@@ -102,13 +102,9 @@ cp refactor/.env.example refactor/.env
 uv run python refactor/refactor.py path/to/script.py
 ```
 
-This reads the system prompt from `refactor/prompt.txt` (editable to customize refactoring instructions), passes the filename to the agent for context, sends the file content to the Antigravity agent, and saves the refactored version as `script_refactored.py` in the same directory.
+The script sends the file to the **LiteRouter `/v1beta/interactions` endpoint** (not the OpenAI chat completions endpoint). It uses the `antigravity-preview-05-2026` agent with an interaction payload of `{agent, input, environment}`. The response is parsed from the interaction's `output_text` or `steps[].model_output` to extract the refactored code. The script then saves it as `script_refactored.py` in the same directory.
 
-To use a custom prompt file:
-
-```bash
-uv run python refactor/refactor.py path/to/script.py --prompt path/to/custom_prompt.txt
-```
+The prompt file `refactor/prompt.txt` (editable) contains the agent's system instructions — it gets prepended to the user message and controls how the agent refactors the code.
 
 ### Refactor an Entire Directory
 
@@ -116,7 +112,7 @@ uv run python refactor/refactor.py path/to/script.py --prompt path/to/custom_pro
 uv run python refactor/refactor.py path/to/src/
 ```
 
-This traverses all `.py` files in the directory recursively, refactors each one individually, and generates a batch report at `refactor/reports/batch_report_*.md`.
+Uses the `/v1beta/interactions` endpoint — same agent, same payload format, just applied to every `.py` file found recursively. Generates a batch report at `refactor/reports/batch_report_*.md`.
 
 ### Offline Transform Mode
 
@@ -125,6 +121,8 @@ Re-render code from a saved raw API response without hitting the API:
 ```bash
 uv run python refactor/refactor.py --transform refactor/reports/some_run_raw.json
 ```
+
+Uses `extract_output_text()` to parse the interaction response and prints the refactored code to stdout. No API call is made.
 
 ### Safety Rules
 
