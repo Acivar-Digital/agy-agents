@@ -31,6 +31,27 @@ There are two distinct actors in this pipeline — the **script** and the **agen
 
 The agent never places files, never reads files, never knows the file path. It only receives code as text and returns refactored code as text.
 
+## Step 0: Customize the Prompt
+
+Before running the refactor, edit the prompt file that tells the agent how to refactor:
+
+```
+refactor/prompt.txt
+```
+
+This file contains the **system prompt** — the instructions the agent follows when refactoring. The default prompt tells the agent to:
+- Enforce PEP 8 compliance and clean architecture
+- Add type hints and docstrings
+- Optimize loops and logic
+- Preserve all existing functionality
+- Output **only raw code** (no markdown blocks or conversational text)
+
+To use a custom prompt for a different task, create your own file and pass it with `--prompt`:
+
+```bash
+uv run python refactor/refactor.py path/to/script.py --prompt path/to/my_prompt.txt
+```
+
 ## Workflow Stages
 
 1. **Ingest** — Script reads target files or directories
@@ -72,11 +93,18 @@ uv run python refactor/refactor.py path/to/messy_script.py
 ```
 
 This will:
+- Read the system prompt from `refactor/prompt.txt` (or use `--prompt` for a custom one)
 - Read `messy_script.py` from disk
 - Send it to the agent via the LiteRouter API
 - Receive back refactored Python code as text
 - Save the result as `messy_script_refactored.py` in the same directory
 - Print a summary
+
+To use a custom prompt file instead of the default `prompt.txt`:
+
+```bash
+uv run python refactor/refactor.py path/to/script.py --prompt path/to/custom_prompt.txt
+```
 
 ### Running a Directory (Batch)
 
@@ -117,6 +145,7 @@ When a user asks to "refactor code" or "improve code quality":
 refactor/
 ├── INSTRUCTIONS.md    ← This file
 ├── .env.example       ← Environment template
+├── prompt.txt         ← Default system prompt for the agent (editable)
 ├── refactor.py        ← Reusable refactoring script (handles all I/O)
 └── reports/           ← Generated (gitignored)
     └── batch_report_*.md

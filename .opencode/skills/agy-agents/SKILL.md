@@ -102,7 +102,13 @@ cp refactor/.env.example refactor/.env
 uv run python refactor/refactor.py path/to/script.py
 ```
 
-This reads the file, sends it to the Antigravity agent with refactoring instructions, and saves the refactored version as `script_refactored.py` in the same directory.
+This reads the system prompt from `refactor/prompt.txt` (editable to customize refactoring instructions), sends the file to the Antigravity agent, and saves the refactored version as `script_refactored.py` in the same directory.
+
+To use a custom prompt file:
+
+```bash
+uv run python refactor/refactor.py path/to/script.py --prompt path/to/custom_prompt.txt
+```
 
 ### Refactor an Entire Directory
 
@@ -170,6 +176,7 @@ agy-agents/
 │       ├── *.md
 │       └── *_raw.json
 ├── refactor/
+│   ├── prompt.txt         ← Default system prompt (editable)
 │   ├── refactor.py        ← Reusable auto-refactor script
 │   ├── .env.example       ← Environment template
 │   ├── INSTRUCTIONS.md    ← Multi-agent refactoring guide

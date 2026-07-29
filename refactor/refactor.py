@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -10,22 +11,26 @@ LITEROUTER_PORT = os.getenv("LITEROUTER_PORT", "7766")
 LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "sk-lr-8f2a9e3b1c4d7e5f")
 GATEWAY_URL = f"http://localhost:{LITEROUTER_PORT}/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are a Senior Principal Software Engineer. Your job is to refactor the Python code provided to you.
-Focus on:
-1. PEP 8 compliance and clean architecture.
-2. Adding helpful type hints and docstrings.
-3. Optimizing loops and logic for performance.
-4. Improving readability without changing behavior.
-5. Preserving all existing functionality — never remove required logic.
-
-CRITICAL: Output ONLY the raw, refactored code.
-Do NOT wrap the code in markdown blocks (no ```python).
-Do NOT include any conversational text, explanations, or pleasantries.
-The output must be immediately executable.
-"""
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_PROMPT_FILE = SCRIPT_DIR / "prompt.txt"
 
 
-def refactor_file(input_file_path: str) -> str | None:
+def load_prompt(prompt_path: str | None) -> str:
+    if prompt_path:
+        path = Path(prompt_path)
+        if not path.exists():
+            print(f"❌ Error: Prompt file not found at {path}")
+            sys.exit(1)
+        return path.read_text(encoding="utf-8").strip()
+
+    if DEFAULT_PROMPT_FILE.exists():
+        return DEFAULT_PROMPT_FILE.read_text(encoding="utf-8").strip()
+
+    print("❌ Error: No prompt file found. Create prompt.txt in the refactor/ directory.")
+    sys.exit(1)
+
+
+def refactor_file(input_file_path: str, system_prompt: str) -> str | None:
     target_file = Path(input_file_path)
     if not target_file.exists():
         print(f"❌ Error: File {target_file} not found.")
@@ -41,7 +46,7 @@ def refactor_file(input_file_path: str) -> str | None:
     payload = {
         "model": "antigravity-preview-05-2026",
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Please refactor this file:\n\n{original_code}"},
         ],
         "temperature": 0.2,
@@ -102,7 +107,7 @@ def find_python_files(directory: str) -> list[Path]:
 
 
 def generate_batch_report(results: list[dict]) -> Path:
-    report_dir = Path(__file__).resolve().parent / "reports"
+    report_dir = SCRIPT_DIR / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -138,6 +143,11 @@ def main():
         help="Path to a Python file or directory of Python files to refactor",
     )
     parser.add_argument(
+        "--prompt",
+        metavar="FILE",
+        help="Path to a custom prompt file (default: refactor/prompt.txt)",
+    )
+    parser.add_argument(
         "--transform",
         action="store_true",
         help="Transform an existing raw JSON response without calling the API",
@@ -151,7 +161,6 @@ def main():
             sys.exit(1)
         res_json = json.loads(raw_json_file.read_text(encoding="utf-8"))
 
-        # Extract the raw code from the API response structure
         choices = res_json.get("choices", [])
         if choices:
             code = choices[0].get("message", {}).get("content", "")
@@ -159,6 +168,8 @@ def main():
         else:
             print("No content found in response JSON.")
         sys.exit(0)
+
+    system_prompt = load_prompt(args.prompt)
 
     target = args.target
     files = find_python_files(target)
@@ -171,13 +182,11 @@ def main():
 
     results = []
     for f in files:
-        out = refactor_file(str(f))
+        out = refactor_file(str(f), system_prompt)
         results.append({"file": str(f), "success": out is not None, "output": out})
 
     generate_batch_report(results)
 
 
 if __name__ == "__main__":
-    import argparse
-
     main()
