@@ -7,6 +7,7 @@ Standalone agentic workflows and tools that run against the [LiteRouter](https:/
 | Agent | Description |
 |---|---|
 | **Deep Research (Institutional Protocol)** | Multi-persona research council that produces heavily cited, institutional-grade whitepapers from live web data. |
+| **Refactor** | Autonomous multi-agent refactoring pipeline that reads Python files, sends them to the Antigravity agent for clean refactoring, and writes the results back to disk. |
 
 ## Quick Start
 
@@ -16,33 +17,32 @@ Standalone agentic workflows and tools that run against the [LiteRouter](https:/
 - Antigravity sandbox access (`antigravity-preview-05-2026`)
 - Python 3.10+ with [uv](https://docs.astral.sh/uv/)
 
-### Setup
+### Deep Research
 
 ```bash
 # 1. Configure the environment
 cp deep-research/.env.example deep-research/.env
-# Edit deep-research/.env with your LITEROUTER_PORT and LITEROUTER_AUTH_KEY
 
-# 2. Ensure LiteRouter is running
-bash scripts/start.sh
-```
-
-### Create a Prompt
-
-Copy the template and customize it:
-
-```bash
+# 2. Create a prompt
 cp deep-research/prompts/_template_guide.md deep-research/prompts/My_Topic.md
-# Edit My_Topic.md — set the objective and customize the 5 personas
-```
+# Edit My_Topic.md
 
-### Run
-
-```bash
+# 3. Run
 uv run python deep-research/deep-research.py My_Topic
 ```
 
-Reports are saved to `deep-research/reports/`.
+### Refactor
+
+```bash
+# 1. Configure the environment
+cp refactor/.env.example refactor/.env
+
+# 2. Refactor a single file
+uv run python refactor/refactor.py path/to/script.py
+
+# 3. Refactor an entire directory
+uv run python refactor/refactor.py path/to/src/
+```
 
 ## Project Structure
 
@@ -59,8 +59,14 @@ agy-agents/
 │   ├── prompts/
 │   │   ├── _template_guide.md   ← Prompt structural template
 │   │   └── *.md                 ← Prompt files (one per topic)
-│   └── reports/                 ← Generated (gitignored)
+│   └── reports/                   ← Generated (gitignored)
 │       └── *.md + *_raw.json
+├── refactor/
+│   ├── refactor.py              ← Reusable auto-refactor script
+│   ├── .env.example             ← Environment template
+│   ├── INSTRUCTIONS.md          ← Multi-agent refactoring guide
+│   └── reports/                   ← Generated (gitignored)
+│       └── batch_report_*.md
 ├── README.md
 ├── AGENTS.md
 └── .gitignore

@@ -1,6 +1,6 @@
 ---
 name: agy-agents
-description: Use the agy-agents toolkit — run the Deep Research agent, create prompts, and transform results via LiteRouter + Antigravity. Use when the user asks to conduct deep research, run a research agent, or use the agy-agents project.
+description: Use the agy-agents toolkit — run the Deep Research agent, create prompts, transform results, or auto-refactor Python code. Use when the user asks to conduct deep research, refactor code, or use the agy-agents project.
 compatibility: Requires Python 3.10+, uv, and a running LiteRouter gateway (port 7766) with Antigravity sandbox access.
 license: MIT
 metadata:
@@ -14,13 +14,17 @@ This skill teaches agents how to use the **agy-agents** project: a collection of
 
 ## Available Agents
 
-### Deep Research (Institutional Protocol)
+### 1. Deep Research (Institutional Protocol)
 
 A multi-persona research council workflow that leverages Antigravity's web-search and sandbox execution to produce heavily cited, institutional-grade whitepapers.
 
-## How to Use — Step by Step
+### 2. Refactor (Auto-Refactoring Pipeline)
 
-### 1. Prerequisites
+An autonomous agent pipeline that reads Python files, sends them to Antigravity for clean refactoring (PEP 8, type hints, docstrings, clean architecture), and writes the results back to disk.
+
+## How to Use — Deep Research
+
+### Prerequisites
 
 Ensure the LiteRouter gateway is running locally on port 7766:
 
@@ -37,7 +41,7 @@ cp deep-research/.env.example deep-research/.env
 # Edit deep-research/.env with your LITEROUTER_PORT and LITEROUTER_AUTH_KEY
 ```
 
-### 2. Create a Research Prompt
+### Create a Research Prompt
 
 Prompts live in `deep-research/prompts/`. Each prompt defines a topic and a 5-persona research council.
 
@@ -46,9 +50,7 @@ To create a new prompt:
 2. Fill in the topic, customize the 5 personas, and set the rubric target.
 3. Save the file — no extensions needed (the `.md` suffix is conventional).
 
-### 3. Run the Deep Research Agent
-
-Execute the script with the prompt name (without `.md`):
+### Run the Deep Research Agent
 
 ```bash
 uv run python deep-research/deep-research.py My_Topic
@@ -62,13 +64,13 @@ This dispatches the prompt to the Antigravity agent via LiteRouter. The agent wi
 
 **Important:** Do not run the agent in the background (`&`). You must wait for it to finish so you can verify the output.
 
-### 4. Review Results
+### Review Results
 
 Reports are saved in `deep-research/reports/` with timestamps:
 - `My_Topic_YYYYMMDD_HHMM.md` — the final whitepaper
 - `My_Topic_YYYYMMDD_HHMM_raw.json` — the raw API response for debugging
 
-### 5. Re-generate from Raw JSON (Offline Transform Mode)
+### Re-generate from Raw JSON (Offline Transform Mode)
 
 If you want to re-render the Markdown report without hitting the API again:
 
@@ -76,7 +78,7 @@ If you want to re-render the Markdown report without hitting the API again:
 uv run python deep-research/deep-research.py --transform deep-research/reports/My_Topic_YYYYMMDD_HHMM_raw.json
 ```
 
-### 6. Batch Execution
+### Batch Execution
 
 Configure `deep-research/run.sh` with your list of prompts, then run:
 
@@ -84,13 +86,72 @@ Configure `deep-research/run.sh` with your list of prompts, then run:
 bash deep-research/run.sh
 ```
 
+## How to Use — Refactor
+
+### Prerequisites
+
+The LiteRouter gateway must be running on port 7766 with Antigravity sandbox access.
+
+```bash
+cp refactor/.env.example refactor/.env
+```
+
+### Refactor a Single File
+
+```bash
+uv run python refactor/refactor.py path/to/script.py
+```
+
+This reads the file, sends it to the Antigravity agent with refactoring instructions, and saves the refactored version as `script_refactored.py` in the same directory.
+
+### Refactor an Entire Directory
+
+```bash
+uv run python refactor/refactor.py path/to/src/
+```
+
+This traverses all `.py` files in the directory recursively, refactors each one individually, and generates a batch report at `refactor/reports/batch_report_*.md`.
+
+### Offline Transform Mode
+
+Re-render code from a saved raw API response without hitting the API:
+
+```bash
+uv run python refactor/refactor.py --transform refactor/reports/some_run_raw.json
+```
+
+### Safety Rules
+
+When a user asks to "refactor code" or "improve code quality":
+
+1. **Always read the file first** — do not send a file you haven't read.
+2. **Output only raw code** — remove Markdown fences and conversational text.
+3. **Verify the output is valid Python** — check for syntax errors before writing.
+4. **Never delete required logic** — only restructure, rename, and add type hints.
+5. **Show the diff** — run `git diff` after writing and present it to the user.
+6. **Run tests if available** — if `pytest` or `unittest` is present, run the relevant tests and fix any failures before finalizing.
+
 ## Agent-Specific Instructions
 
-When a user asks you to "conduct deep research", "research a topic", or "run the deep research tool":
+### When to Use Each Agent
+
+| Request | Agent |
+|---|---|
+| "research a topic" / "conduct deep research" | Deep Research |
+| "refactor code" / "improve code quality" | Refactor |
+
+### Research Workflow Rules
 
 1. **Target Topic Alignment:** Create a prompt file in `deep-research/prompts/` using the template guide. Customize all 5 personas for the user's domain.
 2. **Execution:** Run `uv run python deep-research/deep-research.py PromptName`. Wait for completion — do not background the process.
 3. **Verification:** Check that the report exists in `deep-research/reports/`. Read it to confirm correctness before delivering to the user.
+
+### Refactor Workflow Rules
+
+1. **Read first:** Always read the target file before sending it to the agent.
+2. **Wait for completion:** Do not run refactoring in the background.
+3. **Review the diff:** Always run `git diff` after the agent writes the refactored file.
+4. **Test if possible:** If a test suite exists, run it on the refactored files before finalizing.
 
 ## Project Structure
 
@@ -108,6 +169,12 @@ agy-agents/
 │   └── reports/           ← Generated reports (gitignored)
 │       ├── *.md
 │       └── *_raw.json
+├── refactor/
+│   ├── refactor.py        ← Reusable auto-refactor script
+│   ├── .env.example       ← Environment template
+│   ├── INSTRUCTIONS.md    ← Multi-agent refactoring guide
+│   └── reports/           ← Generated reports (gitignored)
+│       └── batch_report_*.md
 ├── README.md
 ├── AGENTS.md
 └── .gitignore
