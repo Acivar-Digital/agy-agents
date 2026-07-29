@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ae
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
