@@ -1,0 +1,43 @@
+You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).
+
+## TASK
+Refactor `{TARGET_FUNCTION}` in the provided file to reduce its cyclomatic complexity to ≤{TARGET_CC} by extracting logical blocks into private helper functions.
+
+## WHAT YOU MUST DO
+1. Identify the major logical blocks within `{TARGET_FUNCTION}` (per-branch branches, state mutation sections, scoring loops)
+2. Extract each major block into a private helper function (prefixed with `_`)
+3. Replace the extracted blocks in `{TARGET_FUNCTION}` with calls to the new helpers
+4. `{TARGET_FUNCTION}` should end up as a flat sequence of helper calls (CC ≤ {TARGET_CC})
+5. Do NOT extract helpers that just return fixed values — those are data tables, handled separately
+
+## CODE QUALITY STANDARDS
+1. **Type hints:** Add comprehensive type hints to all function arguments and return values
+2. **Docstrings:** Add Google-style docstrings to all functions
+3. **Efficiency:** Optimize where possible without sacrificing readability
+4. **Error handling:** Replace overly broad `except Exception:` with specific exception types where possible
+
+## IRONCLAD CONSTRAINTS
+- **PRESERVE THE API:** Do NOT change the names, arguments, or return types of any existing public functions or classes
+- **PRESERVE IMPORTS:** Do not remove necessary imports and do not hallucinate imports for libraries not already used
+- **NO PLACEHOLDERS:** Output the ENTIRE refactored file. Do NOT use placeholder comments like `# ... rest of code ...` or `# unchanged logic`
+- **NO DESTRUCTIVE CHANGES:** Do not remove any core business logic, edge-case handling, or existing behavior
+- **NO NEW PYDANTIC MODELS:** Do not invent new Pydantic models. Only use existing models from `src2/core/schemas/unified.py`
+- **ZERO-DICTS IN ENGINE INTERNALS:** Do not use dict literals (`{"key": value}`) for domain lookups. Use match/case, tuple dispatch, or Pydantic registry models. Set literals (`{"a", "b", "c"}`) for membership testing are fine — they are not dicts.
+- **PRESERVE MODULE-LEVEL CONSTANTS:** Do not restructure module-level data constants (dicts, sets, tuples). They are acceptable and should be left as-is.
+- **DO NOT INFLATE CC:** Do NOT replace efficient dict lookups (O(1)) with verbose match/case chains — this inflates CC and is the opposite of what we want.
+
+## DOMAIN CONTEXT
+- All Pydantic models referenced in this file have their EXACT schemas defined in `src2/core/schemas/unified.py`. Include them here:
+{SCHEMA_SNIPPETS}
+- When constructing Pydantic model instances, copy the EXACT field names and types from the schemas above. Do NOT rename or invent new fields.
+- Module-level helper functions (`{HELPER_FUNCTIONS}`) are already extracted and must be preserved as-is. Do not restructure them.
+- Key imports from `classical_rules`: `get_ten_god`, `get_zhi_hidden` (confirm from the actual imports in the file — add any others used).
+
+## OUTPUT FORMAT — CRITICAL
+CRITICAL: Output ONLY the raw, executable Python code.
+- Do NOT wrap the code in markdown formatting (no ```python or ```)
+- Do NOT include any conversational text, explanations, or greetings
+- The first character of your response must be the start of Python code
+- Write every line of the complete file from top to bottom. No elisions or placeholders.
+
+HERE IS THE FILE TO REFACTOR:

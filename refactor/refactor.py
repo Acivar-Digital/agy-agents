@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import json
 import os
 import sys
@@ -57,7 +58,21 @@ def load_prompt(prompt_path: str | None) -> str:
     sys.exit(1)
 
 
-def refactor_file(input_file_path: str, prompt: str) -> str | None:
+def load_prompt_dir(prompt_dir: str) -> dict[str, str]:
+    dir_path = Path(prompt_dir)
+    if not dir_path.is_dir():
+        print(f"❌ Error: Prompt directory not found at {dir_path}")
+        sys.exit(1)
+    prompts = {}
+    for f in sorted(dir_path.glob("*.txt")):
+        prompts[f.stem] = f.read_text(encoding="utf-8").strip()
+    if not prompts:
+        print(f"❌ Error: No .txt prompt files found in {dir_path}")
+        sys.exit(1)
+    return prompts
+
+
+def refactor_file(input_file_path: str, prompt: str, prompt_name: str | None = None) -> str | None:
     target_file = Path(input_file_path)
     if not target_file.exists():
         print(f"❌ Error: File {target_file} not found.")
@@ -119,7 +134,9 @@ def refactor_file(input_file_path: str, prompt: str) -> str | None:
                 refactored_code = refactored_code[:-3].strip()
 
             output_file = target_file.with_name(
-                f"{target_file.stem}_refactored{target_file.suffix}"
+                f"{target_file.stem}_{prompt_name}_refactored{target_file.suffix}"
+                if prompt_name
+                else f"{target_file.stem}_refactored{target_file.suffix}"
             )
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(refactored_code.strip() + "\n")
@@ -187,9 +204,14 @@ def main():
         help="Path to a Python file or directory of Python files to refactor",
     )
     parser.add_argument(
-        "--prompt",
-        metavar="FILE",
-        help="Path to a custom prompt file (default: refactor/prompt.txt)",
+        "--prompt-dir",
+        metavar="DIR",
+        help="Directory of prompt files to apply to each target file in parallel",
+    )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Run prompt-dir refactors concurrently (requires --prompt-dir)",
     )
     parser.add_argument(
         "--transform",
@@ -220,6 +242,52 @@ def main():
         sys.exit(1)
 
     print(f"Found {len(files)} Python file(s) to refactor.\n")
+
+    if args.prompt_dir:
+        prompts = load_prompt_dir(args.prompt_dir)
+        print(f"Loaded {len(prompts)} prompt(s) from {args.prompt_dir}.")
+
+        tasks = []
+        for f in files:
+            for prompt_name, prompt_text in prompts.items():
+                tasks.append((str(f), prompt_text, prompt_name))
+
+        print(f"Running {len(tasks)} refactor task(s).\n")
+
+        if args.parallel:
+            max_workers = min(len(tasks), 10)
+            print(f"Parallel mode: {max_workers} worker(s)\n")
+            results = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(refactor_file, f, p, n): (f, n)
+                    for f, p, n in tasks
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    f_path, p_name = futures[future]
+                    out = future.result()
+                    results.append({"file": f_path, "prompt": p_name, "success": out is not None, "output": out})
+        else:
+            results = []
+            for f_path, p_text, p_name in tasks:
+                out = refactor_file(f_path, p_text, prompt_name=p_name)
+                results.append({"file": f_path, "prompt": p_name, "success": out is not None, "output": out})
+
+        generate_batch_report(results)
+
+        successes = sum(1 for r in results if r["success"])
+        failures = sum(1 for r in results if not r["success"])
+        total = len(results)
+
+        if failures == 0:
+            print(f"\n✅ All {total} task(s) refactored successfully.")
+            sys.exit(0)
+        elif successes == 0:
+            print(f"\n❌ All {total} task(s) failed.")
+            sys.exit(1)
+        else:
+            print(f"\n⚠️  {successes} succeeded, {failures} failed.")
+            sys.exit(1)
 
     system_prompt = load_prompt(args.prompt)
 
