@@ -187,6 +187,19 @@ def main():
 
     generate_batch_report(results)
 
+    successes = sum(1 for r in results if r["success"])
+    failures = sum(1 for r in results if not r["success"])
+
+    if failures == 0:
+        print(f"\n✅ All {len(results)} file(s) refactored successfully.")
+        sys.exit(0)
+    elif successes == 0:
+        print(f"\n❌ All {len(results)} file(s) failed.")
+        sys.exit(1)
+    else:
+        print(f"\n⚠️  {successes} succeeded, {failures} failed.")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
