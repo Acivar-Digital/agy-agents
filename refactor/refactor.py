@@ -1,4 +1,4 @@
-import argparse
+import concurrent.futures
 import json
 import os
 import sys
@@ -54,18 +54,14 @@ def load_manifest(manifest_path: str) -> dict:
         sys.exit(1)
 
 
-def load_manifest_dir(manifest_dir: str) -> list[dict]:
-    dir_path = Path(manifest_dir)
-    if not dir_path.is_dir():
-        print(f"❌ Error: Manifest directory not found at {dir_path}")
-        sys.exit(1)
+def load_manifests() -> list[dict]:
     manifests = []
-    for f in sorted(dir_path.glob("*.json")):
+    for f in sorted(MANIFESTS_DIR.glob("*.json")):
         if f.name == "template.json":
             continue
         manifests.append(load_manifest(str(f)))
     if not manifests:
-        print(f"❌ Error: No .json manifest files found in {manifest_dir}")
+        print("❌ Error: No .json manifest files found in refactor/manifests/")
         sys.exit(1)
     return manifests
 
@@ -220,55 +216,28 @@ def generate_batch_report(results: list[dict]) -> Path:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Manifest-driven auto-refactor using antigravity sandbox agent."
-    )
-    parser.add_argument(
-        "--manifest",
-        metavar="FILE",
-        help="Path to a single JSON manifest file",
-    )
-    parser.add_argument(
-        "--manifest-dir",
-        metavar="DIR",
-        help="Directory of JSON manifest files (auto-discovered)",
-    )
-    parser.add_argument(
-        "--transform",
-        action="store_true",
-        help="Transform an existing raw JSON response without calling the API",
-    )
-    args = parser.parse_args()
+    manifest_dir = str(MANIFESTS_DIR)
+    manifests = load_manifests()
 
-    if not args.manifest and not args.manifest_dir:
-        parser.print_help()
-        print("\n❌ Error: Provide --manifest FILE or --manifest-dir DIR")
+    if not manifests:
+        print("❌ Error: No manifest files found in refs/manifests/")
         sys.exit(1)
 
-    if args.transform:
-        raw_json_file = Path(args.manifest or args.manifest_dir)
-        if not raw_json_file.exists():
-            print(f"❌ Error: File not found at {raw_json_file}")
-            sys.exit(1)
-        res_json = json.loads(raw_json_file.read_text(encoding="utf-8"))
-        code = extract_output_text(res_json)
-        if code:
-            print(code)
-        else:
-            print("No content found in response JSON.")
-        sys.exit(0)
+    print(f"Found {len(manifests)} manifest(s). Running all concurrently.\n")
+
+    start_time = time.time()
 
     all_results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(manifests), 20)) as executor:
+        futures = {executor.submit(refactor_with_manifest, m): m for m in manifests}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result = future.result()
+                all_results.update(result)
+            except Exception as e:
+                print(f"❌ Fatal error processing manifest: {e}")
 
-    if args.manifest:
-        manifest = load_manifest(args.manifest)
-        all_results.update(refactor_with_manifest(manifest))
-
-    if args.manifest_dir:
-        manifests = load_manifest_dir(args.manifest_dir)
-        for manifest in manifests:
-            all_results.update(refactor_with_manifest(manifest))
-
+    total_elapsed = time.time() - start_time
     results_list = [
         {"file": k, "success": v, "output": str(v)} for k, v in all_results.items()
     ]
@@ -279,6 +248,7 @@ def main():
 
     print(f"\n{'='*40}")
     print(f"Refactor complete: {successes} succeeded, {failures} failed ({total} total)")
+    print(f"Total time: {total_elapsed:.2f}s")
     print(f"{'='*40}")
 
     generate_batch_report(results_list)
@@ -289,6 +259,10 @@ def main():
         sys.exit(1)
     else:
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
