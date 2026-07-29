@@ -1,15 +1,43 @@
 # Multi-Agent Refactoring Instructions
 
-This document explains how to use AI agents to autonomously refactor codebases using the LiteRouter API Gateway and Antigravity sandbox.
+This document explains how AI agents autonomously refactor code using the LiteRouter API Gateway and Antigravity sandbox.
 
-## Workflow Overview
+## How It Actually Works
 
-The refactoring pipeline follows a four-stage approach:
+There are two distinct actors in this pipeline — the **script** and the **agent**. They never swap roles.
 
-1. **Ingest** — Read target files or directories
+- **The script** (`refactor.py`) handles all filesystem operations: reading files, writing refactored output, generating reports.
+- **The agent** (Antigravity via LiteRouter) only returns **text**. It never touches the disk. It receives raw code and sends back refactored code as a text response.
+
+### The Pipeline
+
+```
+┌─────────────┐    read .py file     ┌──────────────────────────────────┐
+│  Script     │ ───────────────────▶ │  LiteRouter API (Agent)         │
+│  (Python)   │                      │  antigravity-preview-05-2026    │
+│             │  ◀────────────────── │  Returns refactored code as     │
+│  Writes     │   raw text response  │  text (no file placement)       │
+│  _refactored│                      └──────────────────────────────────┘
+│  .py file   │
+│  + report   │
+└─────────────┘
+```
+
+1. **Ingest** — Script reads your `.py` file from disk
+2. **Send** — Script POSTs the code to the LiteRouter gateway with a system prompt ordering raw code output
+3. **Agent** — Antigravity agent refactors the code and returns **only text**
+4. **Write** — Script strips any stray markdown fences from the response and writes the result to `original_name_refactored.py`
+5. **Report** — Script generates a `refactor/reports/batch_report_*.md` summarizing all changes
+
+The agent never places files, never reads files, never knows the file path. It only receives code as text and returns refactored code as text.
+
+## Workflow Stages
+
+1. **Ingest** — Script reads target files or directories
 2. **Analyze** — Agent identifies code smells and refactoring opportunities
-3. **Refactor** — Agent produces clean, refactored code
-4. **Verify** — Diff the changes, run tests, and confirm correctness
+3. **Refactor** — Agent returns clean, refactored Python code as text
+4. **Write** — Script writes the returned text to a new file
+5. **Verify** — Diff the changes with `git diff`, run tests, confirm correctness
 
 ## Best Practices (Grounded in Recent Workflows)
 
@@ -17,7 +45,7 @@ The refactoring pipeline follows a four-stage approach:
 Do not send a large codebase in a single prompt. Read individual files, refactor them, and write them back. This keeps the context window tight and reduces hallucinations.
 
 ### 2. Force Strict Raw Code Output
-By default, AI models wrap code in Markdown blocks or add conversational text. Your prompt must explicitly instruct the agent to output **only raw code** so it can be written directly to a file.
+By default, AI models wrap code in Markdown blocks or add conversational text. Your prompt must explicitly instruct the agent to output **only raw code** so the script can write it directly to a file. The system prompt in `refactor.py` enforces this, and a safety net strips any stray ` ```python ` fences from the response (lines 71–74).
 
 ### 3. Keep Context Tightly Scoped
 If the file depends on external modules or shared utilities, include a brief summary of those dependencies in the prompt so the agent doesn't hallucinate missing functions.
@@ -44,10 +72,11 @@ uv run python refactor/refactor.py path/to/messy_script.py
 ```
 
 This will:
-- Read the file
-- Send it to the agent with refactoring instructions
-- Save the refactored version as `path/to/messy_script_refactored.py`
-- Print a summary of changes
+- Read `messy_script.py` from disk
+- Send it to the agent via the LiteRouter API
+- Receive back refactored Python code as text
+- Save the result as `messy_script_refactored.py` in the same directory
+- Print a summary
 
 ### Running a Directory (Batch)
 
@@ -57,28 +86,30 @@ uv run python refactor/refactor.py path/to/src/
 
 This will:
 - Traverse all `.py` files in the directory recursively
-- Refactor each file individually
-- Save refactored versions alongside originals
-- Generate a `refactor/reports/batch_report.md` summarizing all changes
+- Refactor each file individually via the API
+- Save refactored versions alongside originals (`_refactored.py`)
+- Generate a `refactor/reports/batch_report_*.md` summarizing all changes
 
 ### Offline Transform Mode
 
-If you have previously saved raw API responses and want to re-render them without hitting the API:
+If you have previously saved raw API responses and want to extract the code without hitting the API again:
 
 ```bash
 uv run python refactor/refactor.py --transform refactor/reports/some_run_raw.json
 ```
 
+This prints the extracted code to stdout (no file is written — useful for piping or inspection).
+
 ## Safety Rules for Agents
 
 When a user asks to "refactor code" or "improve code quality":
 
-1. **Always read the file first** — do not send a file you haven't read.
-2. **Output only raw code** — remove Markdown fences and conversational text.
-3. **Verify the output is valid Python** — check for syntax errors before writing.
+1. **You are an agent, not a file operator** — you only return text. The Python script handles all filesystem operations (reading input files, writing output files). Do not attempt to open, read, or write files directly.
+2. **Output only raw code** — do not wrap code in markdown blocks (no ` ```python `). Do not include any conversational text, explanations, or pleasantries. The output must be immediately executable Python.
+3. **Verify your output is valid Python** — check for syntax errors and missing imports before returning code.
 4. **Never delete required logic** — only restructure, rename, and add type hints.
-5. **Show the diff** — run `git diff` after writing and present it to the user.
-6. **Run tests if available** — if `pytest` or `unittest` is present, run the relevant tests and fix any failures before finalizing.
+5. **The human reviews the diff** — after the script writes `_refactored.py` files, the user runs `git diff` to see all changes before committing.
+6. **Run tests if available** — if `pytest` or `unittest` is present, run the relevant tests on the refactored files and fix any failures before finalizing.
 
 ## Project Structure
 
@@ -86,8 +117,7 @@ When a user asks to "refactor code" or "improve code quality":
 refactor/
 ├── INSTRUCTIONS.md    ← This file
 ├── .env.example       ← Environment template
-├── refactor.py        ← Reusable refactoring script
-└── reports/           ← Generated reports (gitignored)
-    ├── batch_report.md
-    └── *_raw.json
+├── refactor.py        ← Reusable refactoring script (handles all I/O)
+└── reports/           ← Generated (gitignored)
+    └── batch_report_*.md
 ```
