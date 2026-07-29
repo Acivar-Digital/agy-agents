@@ -1,40 +1,41 @@
 # Multi-Agent Refactoring Instructions
 
+## Endpoint Contract (Critical — Read First)
+
+| Field | Value |
+|---|---|
+| **URL** | `http://localhost:7766/v1beta/interactions` |
+| **Method** | `POST` |
+| **Agent** | `antigravity-preview-05-2026` |
+| **Environment** | `remote` |
+
+**Payload format:**
+```json
+{
+  "agent": "antigravity-preview-05-2026",
+  "input": "<prompt + filename + code>",
+  "environment": "remote"
+}
+```
+
+**Response format:** An interaction object with `object: "interaction"`, `status: "completed"`, and a `steps` array containing `thought` and `model_output` entries. Extract the refactored code from `steps[].content` entries where `type == "model_output"`.
+
+> **⚠️ This uses `/v1beta/interactions` — NOT `/v1/chat/completions`.** The interaction endpoint has a completely different request/response format than OpenAI chat completions. The payload uses `{agent, input, environment}` (not `messages`/`model`), and the response uses `steps` (not `choices`). Do not attempt to use the OpenAI chat completions format with this API.
+
 This document explains how AI agents autonomously refactor code using the LiteRouter API Gateway and Antigravity sandbox.
 
-## How It Actually Works
+## How It Works
 
-There are two distinct actors in this pipeline — the **script** and the **agent**. They never swap roles.
+The **script** (`refactor.py`) does all filesystem work. It reads `.py` files, sends code to the LiteRouter API, and writes refactored output. The **agent** (Antigravity) only returns text — never touches disk.
 
-- **The script** (`refactor.py`) handles all filesystem operations: reading files, writing refactored output, generating reports.
-- **The agent** (Antigravity via LiteRouter) only returns **text**. It never touches the disk. It receives raw code and sends back refactored code as a text response.
-
-### The Pipeline
-
-```
-┌─────────────┐    read .py file     ┌──────────────────────────────────────────────────┐
-│  Script     │ ───────────────────▶ │  LiteRouter /v1beta/interactions endpoint     │
-│  (Python)   │                      │  antigravity-preview-05-2026 agent            │
-│             │                      │  Payload: {agent, input, environment}          │
-│             │  ◀────────────────── │  Response: interaction JSON with steps         │
-│  Writes     │   extract output     │  text from output_text / model_output steps   │
-│  _refactored│                      └──────────────────────────────────────────────────┘
-│  .py file   │
-│  + report   │
-└─────────────┘
-```
+### Pipeline
 
 1. **Ingest** — Script reads your `.py` file from disk
-2. **Send** — Script POSTs to `/v1beta/interactions` with the interaction payload:
-   ```json
-   {"agent": "antigravity-preview-05-2026", "input": "<prompt + filename + code>", "environment": "remote"}
-   ```
-3. **Agent** — Antigravity agent receives the interaction, refactors the code, returns the result through the interaction steps
-4. **Extract** — Script uses `extract_output_text()` to pull the refactored code from the interaction response (checks `output_text`, `output`, `response`, `answer`, `result` top-level keys, then `steps[].model_output`)
-5. **Write** — Script strips any stray markdown fences and writes the result to `original_name_refactored.py`
-6. **Report** — Script generates a `refactor/reports/batch_report_*.md` summarizing all changes
-
-**IMPORTANT:** This uses the `/v1beta/interactions` endpoint — NOT `/v1/chat/completions`. The interaction endpoint has a different request/response format than OpenAI-style chat completions. The payload format is `{agent, input, environment}` and the response is an interaction object with `steps`, not a `choices` array.
+2. **Send** — Script POSTs to `/v1beta/interactions` with the interaction payload (see Endpoint Contract above)
+3. **Agent** — Antigravity refactors the code and returns it as text via `steps[].model_output`
+4. **Extract** — Script pulls the refactored code from the response
+5. **Write** — Script writes the result to `original_name_refactored.py`
+6. **Report** — Script generates a `refactor/reports/batch_report_*.md`
 
 The agent never places files, never reads files, never knows the file path. It only receives code as text and returns refactored code as text.
 
