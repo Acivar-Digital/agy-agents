@@ -1,20 +1,17 @@
 #!/bin/bash
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="/home/yapilwsl/arthityap/baziforecaster"
-MANIFEST_DIR="$SCRIPT_DIR/manifests"
-
 export LITEROUTER_PORT=7766
 export LITEROUTER_AUTH_KEY=sk-lr-8f2a9e3b1c4d7e5f
 
-echo "🚀 Auto-refactoring all manifests in $MANIFEST_DIR"
-echo "   Project: $PROJECT_DIR"
-echo "   Mode: sequential (one JSON manifest = one API call)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+echo "🚀 Running all manifests from refactor/manifests/"
+echo "   Mode: concurrent"
 echo "   Timeout: 300s per manifest"
 echo ""
 
-uv run python "$SCRIPT_DIR/refactor.py" --manifest-dir "$MANIFEST_DIR"
+uv run python "$SCRIPT_DIR/refactor.py"
 
 echo ""
 echo "✅ Done. Check the diff:"
