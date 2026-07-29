@@ -19,7 +19,17 @@ You create a **JSON manifest file** in `refactor/manifests/` that describes one 
 
 > **⚠️ This uses `/v1beta/interactions` — NOT `/v1/chat/completions`.** The payload format is `{agent, input, environment}` where `input` is a single string. The response is an interaction object with `steps`, not a `choices` array.
 
-## Manifest Format
+## Configuration
+
+Environment variables control the runtime. Copy `.env.example` to `.env` and edit as needed:
+
+| Variable | Default | Description |
+|---|---|---|
+| `LITEROUTER_PORT` | `7766` | LiteRouter gateway port |
+| `LITEROUTER_AUTH_KEY` | `sk-lr-8f2a9e3b1c4d7e5f` | API key for LiteRouter authentication |
+| `TIMEOUT` | `600` | Request timeout in seconds per manifest execution |
+
+The `.env` file is loaded automatically by `run.sh`. Adjust `TIMEOUT` if refactoring large files or running complex prompts that take longer than 10 minutes.
 
 Each manifest is a JSON file in `refactor/manifests/`. There is no template — just create a `.json` file and fill it in.
 

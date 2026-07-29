@@ -10,6 +10,7 @@ from datetime import datetime
 
 LITEROUTER_PORT = os.getenv("LITEROUTER_PORT", "7766")
 LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "sk-lr-8f2a9e3b1c4d7e5f")
+TIMEOUT = int(os.getenv("TIMEOUT", "600"))
 GATEWAY_URL = f"http://localhost:{LITEROUTER_PORT}/v1beta/interactions"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -153,7 +154,7 @@ def refactor_with_manifest(manifest: dict, delay: int = 0) -> dict[str, bool]:
         start_time = time.time()
 
         try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
                 res_body = resp.read().decode("utf-8")
                 res_json = json.loads(res_body)
 
