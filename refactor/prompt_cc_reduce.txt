@@ -1,59 +1,32 @@
 You are a Staff-Level Python Engineer refactoring code to reduce cyclomatic complexity (CC).
 
-Your task: Refactor the score_day function and its sub-scorers in activity_oracle.py to bring ALL functions to CC <= 10 (ruff C901).
+## TASK
+Refactor `resolve_contradictions` in the provided file to reduce its cyclomatic complexity to ≤10 by extracting logical blocks into private helper functions.
 
-## Target Functions
+## WHAT YOU MUST DO
+1. Identify the major logical blocks within `resolve_contradictions` (nested loops, conditional chains, state mutation sections)
+2. Extract each major block into a private helper function (prefixed with `_`)
+3. Replace the extracted blocks in `resolve_contradictions` with calls to the new helpers
+4. `resolve_contradictions` should end up as a flat sequence of helper calls (CC ≤ 10)
 
-The following functions in src2/engine/activity_oracle.py are too complex:
-- _score_travel (CC ~10)
-- _score_job_interview (CC 11)
-- _score_love (CC 11)
-- _score_speculation (CC 13)
-- _score_study (CC 12)
+## CODE QUALITY STANDARDS
+1. **Type hints:** Add comprehensive type hints to all function arguments and return values
+2. **Docstrings:** Add Google-style docstrings to all functions
+3. **Efficiency:** Optimize where possible without sacrificing readability
+4. **Error handling:** Replace overly broad `except Exception:` with specific exception types where possible
 
-The outer score_day (line 712) is already flat (CC ~3) — leave it alone.
+## IRONCLAD CONSTRAINTS
+- **PRESERVE THE API:** Do NOT change the names, arguments, or return types of any existing public functions or classes
+- **PRESERVE IMPORTS:** Do not remove necessary imports and do not hallucinate imports for libraries not already used
+- **NO PLACEHOLDERS:** Output the ENTIRE refactored file. Do NOT use placeholder comments like `# ... rest of code ...` or `# unchanged logic`
+- **NO DESTRUCTIVE CHANGES:** Do not remove any core business logic, edge-case handling, or existing behavior
+- **ALL original helper functions that do not need modification must remain unchanged**
 
-## Refactoring Strategy
+## OUTPUT FORMAT — CRITICAL
+CRITICAL: Output ONLY the raw, executable Python code.
+- Do NOT wrap the code in markdown formatting (no ```python or ```)
+- Do NOT include any conversational text, explanations, or greetings
+- The first character of your response must be the start of Python code
+- Write every line of the complete file from top to bottom. No elisions or placeholders.
 
-### 1. Extract _apply_base_scoring helper
-All 5 sub-scorers share identical 3-step tail — create ONE helper:
-
-def _apply_base_scoring(score: int, reasons: list[str], active_stem: str, active_branch: str, profile: ChartProfile) -> tuple[int, str]:
-    # Handles: favorable/unfavorable element, void day penalty, branch element favor
-    # Returns: (score, reasons) after applying all three steps
-
-Each sub-scorer replaces their tail with: return _apply_base_scoring(score, reasons, active_stem, active_branch, profile)
-
-### 2. Extract per-activity ten god dispatchers
-Each sub-scorer has activity-specific ten god if/elif/else chains. Extract each into a thin helper that takes (dm_stem, active_stem) and returns (score_delta, reason):
-
-def _ten_god_travel(dm_stem: str, active_stem: str) -> tuple[int, str]
-def _ten_god_job(dm_stem: str, active_stem: str) -> tuple[int, str]
-def _ten_god_love(dm_stem: str, active_stem: str, gender: str) -> tuple[int, str]
-def _ten_god_speculation(dm_stem: str, active_stem: str) -> tuple[int, str]
-def _ten_god_study(dm_stem: str, active_stem: str) -> tuple[int, str]
-
-### 3. Extract per-activity star helpers where applicable
-If a sub-scorer has more than 3 inline star checks (e.g. wenchang, canopy, clash, month alignment in _score_study), extract them into _stars_travel, _stars_job, _stars_love, _stars_speculation, _stars_study.
-
-### 4. Simplify sub-scorers
-Each sub-scorer becomes:
-- Extract variables (active_stem, active_branch, dm_stem)
-- Call ten god dispatcher
-- Call star dispatcher if extracted
-- Call _apply_base_scoring
-- Return clamped score + join reasons
-
-## CONSTRAINTS (MANDATORY)
-
-1. Do NOT change score_day or any public API signature
-2. Do NOT invent new Pydantic models — use only existing ones from the imports
-3. Do NOT use dict literals for domain lookups (zero-dicts rule)
-4. Do NOT use match/case for dispatch if if/elif chains already work — keep existing patterns
-5. All new helpers must be private (underscore prefix)
-6. Keep ALL existing logic — only restructure
-7. Do NOT modify imports unless adding a new private helper that needs a new import
-8. Output ONLY the complete refactored file as raw Python code — no markdown, no explanations, no commentary
-9. The first character of your response must be the first character of the Python script
-10. The output must be syntactically valid Python that can be run directly
-11. Preserve ALL original behavior exactly — no logic changes
+HERE IS THE FILE TO REFACTOR:
