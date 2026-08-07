@@ -27,7 +27,7 @@ Act as the strict Quality Supervisor. Review the Aggregator's draft against the 
 - **Rule:** If the draft fails to meet the rubric (e.g., missing data, weak arguments), you are permitted **exactly ONE (1) revision cycle** to patch the gaps with new searches and rewrite the weak sections. Do not get stuck in an infinite loop.
 
 ### Phase 4: Final Output Delivery
-Output the final, approved Markdown report.
+Output the final, approved Markdown report. The synthesized report follows the Section 5 structure below — this is your primary deliverable. After the Sources & References section, attach an **"Appendix: Persona Dossiers"** containing the raw, un-summarized findings from each of the 5 personas. Preserve the quotes, metrics, and search data gathered during Phase 1 — do not re-synthesize or shorten this appendix material.
 
 ---
 
@@ -73,3 +73,4 @@ Synthesize the final output into a clean Markdown whitepaper with the following 
 5. **Section IV: Council Consensus & Bear Case Dissent Matrix** (Structured comparison table mapping the Bull vs Bear scenarios)
 6. **Section V: Supervisor Scorecard & Revision Log** (Briefly explain the 6-dimension scores and what was fixed during the revision cycle).
 7. **Sources & References** (Exhaustive list of the 50+ verified sources and URLs).
+8. **Appendix: Persona Dossiers** (Raw Phase 1 findings — quotes, metrics, search data — from each of the 5 personas. Do not re-synthesize or shorten this section).

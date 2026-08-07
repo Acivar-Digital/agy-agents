@@ -32,6 +32,11 @@ You are orchestrating an expert research council. You must evaluate the topic th
 
 ---
 
+## OUTPUT DELIVERY RULE
+The synthesized report follows the Section 5 structure below — this is your primary deliverable. After the Sources & References section, attach an "Appendix: Persona Dossiers" containing the raw, un-summarized findings from each of the 5 personas. Preserve the quotes, metrics, and search data gathered during research — do not re-synthesize or shorten this appendix material.
+
+---
+
 ## RUBRIC CUBE EVALUATION (Target Minimum Score: 4.5 / 5.0)
 Before completing the final output, evaluate findings against 6 quality dimensions:
 1. **Source Diversity:** Minimum 4 source types (Academic/Gov, Financial Filings, Tech Industry Data, Market Analysis).
@@ -53,3 +58,4 @@ Synthesize all persona findings into a clean Markdown whitepaper with the follow
 6. **Section V: Council Consensus & Bear Case Dissent Matrix** (Structured comparison table of Bull vs Bear perspectives)
 7. **Section VI: Rubric Scorecard & Confidence Assessment** (6-dimension scores with justification and confidence levels)
 8. **Sources & References** (List of verified sources and URLs)
+9. **Appendix: Persona Dossiers** (Full Thick Dossier from each of the 5 personas, preserving raw findings, quotes, metrics, and search data gathered during research)
