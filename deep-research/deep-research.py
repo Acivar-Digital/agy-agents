@@ -119,8 +119,10 @@ class InteractionStep(BaseModel):
 
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
+    type: str | None = None
     thought: str | None = None
     model_output: str | None = None
+    content: list[dict[str, JsonValue]] | str | None = None
     tool_call: dict[str, JsonValue] | None = None
     tool_output: dict[str, JsonValue] | None = None
 
@@ -148,10 +150,10 @@ class InteractionResponse(BaseModel):
         for step in reversed(self.steps):
             if step.model_output and step.model_output.strip():
                 return step.model_output.strip()
-            step_dict = step.model_dump()
-            content = step_dict.get("content")
-            if isinstance(content, list):
-                for part in content:
+            if isinstance(step.content, str) and step.content.strip():
+                return step.content.strip()
+            if isinstance(step.content, list):
+                for part in step.content:
                     if (
                         isinstance(part, dict)
                         and isinstance(part.get("text"), str)
@@ -287,19 +289,13 @@ def get_provider_config(provider_override: ProviderChoice = "auto") -> ProviderC
         )
 
 
-# Instruct the agent to natively build the files and save them to disk
+# Instruct the agent to output a complete Markdown report (no slow PDF/DOCX/HTML compilation)
 AGENT_FILE_INSTRUCTION = """
 \n\n======================================================================
-CRITICAL SYSTEM OVERRIDE FOR NATIVE FILE GENERATION:
-You are operating in a remote code execution sandbox. You MUST natively generate the final output in 4 formats and save them to your current working directory.
-1. Synthesize your final research into a comprehensive Markdown report.
-2. Write and execute a Python script in your sandbox to create the files. (Use pip to install libraries like markdown, weasyprint, or python-docx as needed).
-3. You MUST save the files exactly as:
-   - report.md
-   - report.html
-   - report.pdf
-   - report.docx
-4. Do not output their contents in text. Just save them to disk and confirm completion.
+CRITICAL OUTPUT MANDATE (MARKDOWN ONLY):
+1. Synthesize your final research into a comprehensive, institutional-grade Markdown report.
+2. Output the COMPLETE Markdown report directly in your final text response. Do NOT truncate or summarize.
+3. Do NOT install Python packages or compile HTML, PDF, or DOCX files in the sandbox.
 ======================================================================
 """
 
@@ -310,7 +306,7 @@ def download_and_extract_sandbox(
     download_url_template: str,
     headers: dict[str, str],
 ) -> list[Path]:
-    """Downloads the full sandbox snapshot (.tar) and extracts the target report files."""
+    """Downloads the sandbox snapshot (.tar) and extracts report.md if present."""
     url = download_url_template.format(env_id=env_id)
     extracted_paths: list[Path] = []
 
@@ -331,23 +327,15 @@ def download_and_extract_sandbox(
         with tarfile.open(tmp_tar_path) as tar:
             tar.extractall(path=extract_dir)
 
-        formats = ["md", "html", "pdf", "docx"]
-        for fmt in formats:
-            target_name = f"report.{fmt}"
-            found = False
-
-            for root_dir, _, files in os.walk(extract_dir):
-                if target_name in files:
-                    src_file = Path(root_dir) / target_name
-                    final_path = base_output_path.with_suffix(f".{fmt}")
-                    shutil.move(str(src_file), str(final_path))
-                    print(f"✅ Extracted native file: {final_path.name}")
-                    extracted_paths.append(final_path)
-                    found = True
-                    break
-
-            if not found:
-                print(f"⚠️ Agent failed to generate {target_name} inside the sandbox.")
+        target_name = "report.md"
+        for root_dir, _, files in os.walk(extract_dir):
+            if target_name in files:
+                src_file = Path(root_dir) / target_name
+                final_path = base_output_path.with_suffix(".md")
+                shutil.move(str(src_file), str(final_path))
+                print(f"✅ Extracted native file: {final_path.name}")
+                extracted_paths.append(final_path)
+                break
 
         os.remove(tmp_tar_path)
         shutil.rmtree(extract_dir)
@@ -426,7 +414,14 @@ def execute_research(
     env_id = parsed_resp.environment_id
 
     extracted_files: list[Path] = []
-    if env_id:
+    md_path = base_output_path.with_suffix(".md")
+
+    # Prefer direct Markdown text from the interaction response (fastest, no tarball needed)
+    fallback_text = parsed_resp.extract_text()
+    if fallback_text and len(fallback_text.strip()) > 200:
+        md_path.write_text(fallback_text, encoding="utf-8")
+        extracted_files.append(md_path)
+    elif env_id:
         try:
             extracted_files = download_and_extract_sandbox(
                 env_id=env_id,
@@ -436,12 +431,7 @@ def execute_research(
             )
         except Exception as e:
             print(f"⚠️ Sandbox download warning: {e}", file=sys.stderr)
-
-    has_md = any(p.suffix == ".md" for p in extracted_files)
-    if not has_md:
-        fallback_text = parsed_resp.extract_text()
-        if fallback_text:
-            md_path = base_output_path.with_suffix(".md")
+        if not any(p.suffix == ".md" for p in extracted_files) and fallback_text:
             md_path.write_text(fallback_text, encoding="utf-8")
             extracted_files.insert(0, md_path)
 
@@ -506,7 +496,9 @@ def run_deep_research():
 
     prompt_content = prompt_file.read_text(encoding="utf-8").strip()
 
-    print("🚀 Dispatching request. Agent is conducting research and rendering files...")
+    print(
+        "🚀 Dispatching request. Agent is conducting research and synthesizing Markdown report..."
+    )
     try:
         result = execute_research(
             prompt_content=prompt_content,
@@ -514,14 +506,30 @@ def run_deep_research():
             previous_interaction_id=args.previous_interaction_id,
             provider=args.provider,
         )
-        print(f"\n✅ Execution finished in {result['elapsed_seconds']} seconds!")
-        print(f"💾 Saved JSON API format to: {result['raw_json_path']}")
-        if result["extracted_files"]:
-            print(f"📦 Extracted files: {len(result['extracted_files'])}")
-        print("\n🎉 Deep Research Complete!")
+        md_files = [f for f in result["extracted_files"] if f.endswith(".md")]
+        report_md_path = md_files[0] if md_files else "NONE"
+        print("\n==================================================================")
+        print("✅ DEEP RESEARCH COMPLETE (EXIT CODE: 0)")
+        print("==================================================================")
+        print(f"⏱️  ELAPSED TIME:               {result['elapsed_seconds']} seconds")
+        print(f"📄 COLLECT MARKDOWN REPORT AT: {report_md_path}")
+        print(f"💾 RAW INTERACTION JSON:       {result['raw_json_path']}")
+        print("==================================================================")
+        print(
+            f"👉 LLM ACTION REQUIRED: Read the Markdown report at `{report_md_path}` to consume the full research findings."
+        )
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Execution Error: {e}")
+        print(
+            "\n==================================================================",
+            file=sys.stderr,
+        )
+        print("❌ DEEP RESEARCH FAILED (EXIT CODE: 1)", file=sys.stderr)
+        print(
+            "==================================================================",
+            file=sys.stderr,
+        )
+        print(f"Error Details: {e}", file=sys.stderr)
         sys.exit(1)
 
 

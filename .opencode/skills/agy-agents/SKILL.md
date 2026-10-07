@@ -1,6 +1,6 @@
 ---
 name: agy-agents
-description: Use the agy-agents toolkit — run the Deep Research agent, create prompts, transform results, auto-refactor Python code, or connect via FastMCP server with async job polling and live HTTP artifact delivery. Supports Google Gemini API directly or via self-hosted LiteRouter.
+description: Use the agy-agents toolkit — run the Deep Research agent, prepare prompts, collect Markdown (.md) reports, or auto-refactor Python code via CLI and FastMCP instruction wrapper. Supports Google Gemini API directly or via self-hosted LiteRouter.
 compatibility: Requires Python 3.10+, uv or pip, and GEMINI_API_KEY (or LiteRouter gateway).
 license: MIT
 metadata:
@@ -10,7 +10,7 @@ metadata:
 
 # agy-agents — Agent Toolkit Skill
 
-This skill teaches agents how to use the **agy-agents** project: a collection of standalone agentic workflows and a sovereign FastMCP server connecting to Google's Antigravity sandbox (`antigravity-preview-09-2026`) via `/v1beta/interactions`.
+This skill teaches agents how to use the **agy-agents** project: a collection of standalone agentic workflows and a FastMCP instruction wrapper connecting to Google's Antigravity sandbox (`antigravity-preview-09-2026`) via `/v1beta/interactions`.
 
 It supports dual-engine inference:
 1. **Direct Google Gemini API (Default for Community)**: `GEMINI_API_KEY`
@@ -18,116 +18,78 @@ It supports dual-engine inference:
 
 ---
 
-## Architecture & Interfaces
+## How Deep Research Works (Simplified CLI-Trigger Workflow)
 
-The toolkit provides two primary operational interfaces:
-1. **Model Context Protocol (FastMCP Server)**: Seamless integration into agent harnesses (`omp`, OpenCode, Claude Desktop, Cursor) with asynchronous background job polling to eliminate 60s client timeouts.
-2. **Direct Python CLI / Scripts**: Direct execution of research council sprints and Python code refactoring pipelines.
+1. **Prepare or Select Prompt**: Prompts live in `deep-research/prompts/<stem>.md`. Use `prepare_research_prompt` or `start_research` (or create the `.md` prompt directly) to prepare the 5-persona research council prompt.
+2. **Trigger the CLI Directly**: Run the CLI script via your `bash` tool (do **NOT** use `&` or `nohup`; set `timeout: 600`):
+   ```bash
+   uv run python deep-research/deep-research.py <stem> --provider literouter
+   ```
+3. **Wake Up on Exit Code `0` & Collect `.md` Report**:
+   - The CLI runs the 5-persona research sprint and synthesizes the report **only in Markdown (`.md`) format** (no slow HTML/PDF/DOCX compilation).
+   - When finished, the script exits with **exit code `0`** (which automatically wakes the LLM up if backgrounded by the harness) and prints verbose output telling the LLM the exact path to collect the `.md` report:
+     ```text
+     ==================================================================
+     ✅ DEEP RESEARCH COMPLETE (EXIT CODE: 0)
+     ==================================================================
+     ⏱️  ELAPSED TIME:               <seconds> seconds
+     📄 COLLECT MARKDOWN REPORT AT: /path/to/deep-research/reports/<stem>_<YYYYMMDD_HHMM>.md
+     💾 RAW INTERACTION JSON:       /path/to/deep-research/reports/<stem>_<YYYYMMDD_HHMM>_raw.json
+     ==================================================================
+     👉 LLM ACTION REQUIRED: Read the Markdown report at `<path>.md` to consume the full research findings.
+     ```
+   - Read that `.md` file directly (or call `get_research_status(job_id="<stem>")`) to consume the report.
 
 ---
 
 ## Sovereign MCP Tools (`agy-mcp`)
 
-The MCP server runs via `agy-mcp` (or `uv run python mcp_server.py`) and is hosted on `vps466a` (port `7788`, DNS `agy-agents.lan`). It implements **dual transport** (Streamable HTTP `POST /sse` / `POST /mcp` for `omp` and legacy SSE `GET /sse`).
+The MCP server (`mcp_server.py`) acts as an instruction & prompt-preparation wrapper on port `7788` (`http://agy-agents.lan:7788/sse`). All tool inputs enforce `ConfigDict(extra="forbid", validate_assignment=True)`.
 
 ### 1. `check_gateway_health`
 Probes connectivity, latency, and authorization against the active inference gateway (`literouter` or `gemini`).
-- **When to use**: Before initiating long runs or diagnosing connection drops.
-- **Output**: HTTP status, response time in ms, resolved endpoint URL, and status message.
+- **Parameters**: None.
 
 ### 2. `list_research_prompts`
-Discovers all available institutional prompt stems in `deep-research/prompts/`.
-- **When to use**: To inspect existing templates (e.g. `Direction_of_JPY`) or discover topic stems for research.
+Lists all available structured research prompt templates and stems in `deep-research/prompts/`.
+- **Parameters**: None.
 
 ### 3. `prepare_research_prompt`
-Generates a Citi-grade institutional 5-persona research prompt file.
-- **Parameters**: `topic` (str), `stem` (optional str).
-- **Output**: Path to saved prompt (`deep-research/prompts/<stem>.md`), preview, and ready-to-run CLI invocation.
+Generates and validates an institutional Citi-grade 5-persona research prompt file in `deep-research/prompts/<prompt_stem>.md`, explains how the workflow operates, and returns the exact CLI command to trigger.
+- **Parameters**:
+  - `topic` (`str`, required): Core research subject or question for the 5-persona research council.
+  - `prompt_stem` (`str`, default `"custom_research"`): File stem for the generated prompt file (e.g. `"Direction_of_JPY"`).
+  - `custom_rubric` (`str | None`, default `None`): Optional specific research guidelines, scope limits, or focus domains.
 
 ### 4. `start_research`
-Launches an autonomous 5-persona deep research council in the background.
-- **Parameters**: `topic_or_stem` (str).
-- **Behavior**: Returns immediately with a unique `job_id` (`job_xxxxxxxx`) to prevent 60-second client-side RPC disconnects.
+Instruction wrapper that prepares `deep-research/prompts/<prompt_stem>.md` (if not already present) and returns step-by-step instructions telling the LLM how the workflow operates and the exact CLI command (`uv run python deep-research/deep-research.py <stem>`) to trigger so it wakes up on exit code `0` to collect the `.md` report.
+- **Parameters**:
+  - `prompt_stem_or_topic` (`str`, required): Existing prompt stem (e.g. `"Direction_of_JPY"`) or a research topic to sculpt dynamically.
+  - `prompt_stem` (`str`, default `"custom_research"`): File stem to use if a new prompt is sculpted from a topic.
+  - `custom_rubric` (`str | None`, default `None`): Optional specific rubric or focus if creating a new prompt dynamically.
+  - `timeout_seconds` (`float`, default `600.0`): Recommended CLI timeout in seconds.
 
 ### 5. `get_research_status`
-Polls the execution state of an asynchronous research job or retrieves a finished report.
-- **Parameters**: `job_id` (str — accepts either `job_xxxxxxxx` or a prompt stem like `Direction_of_JPY`).
-- **Return Content**:
-  - `status`: `"running"`, `"completed"`, or `"failed"`.
-  - `#### Executive Summary`: High-level synthesis, committee consensus, and core findings.
-  - `#### Full Markdown Report`: **In-band delivery** of the complete whitepaper directly into the LLM context window.
-  - `#### Artifacts & Downloads`: Local filesystem paths and live LAN HTTP URLs (`http://agy-agents.lan:7788/reports/<file>.md|.pdf|.docx`).
+Retrieves the latest completed Markdown (`.md`) report for a prompt stem or `job_id`, returning the `.md` file path, LAN HTTP link (`http://agy-agents.lan:7788/reports/<file>.md`), executive summary, and full in-band Markdown report content.
+- **Parameters**:
+  - `job_id` (`str`, required): Prompt stem (e.g. `"Direction_of_JPY"`) or job ID returned by `start_research`.
 
 ### 6. `refactor_code`
-Autonomously modernizes and cleans Python code enforcing strict type hints, docstrings, and PEP 8 standards. Fast synchronous tool (5-15s).
-- **Parameters**: `code` (str), `instructions` (optional str).
-- **Output**: Syntactically validated cleaned Python code and unified diff summary.
-
----
-
-## Report Delivery & Artifact Consumption
-
-When consuming deep research results, client LLMs have three pickup channels:
-
-| Channel | Method | Use Case |
-|---|---|---|
-| **In-Band MCP Context** | `get_research_status(job_id)` | Primary: LLM immediately ingests `#### Full Markdown Report` without external file reads. |
-| **LAN HTTP Static Route** | `http://agy-agents.lan:7788/reports/{filename}` | Direct browser or LLM URL fetch for `.md`, `.html`, `.pdf`, and `.docx` artifacts. |
-| **Host Filesystem** | `deep-research/reports/{filename}` | Local filesystem access on the server hosting `agy-agents`. |
-
----
-
-## Client MCP Configuration
-
-### oh-my-pi (`omp`)
-`omp` imports servers from OpenCode via `enabledProviders: [opencode]` in `~/.omp/agent/config.yml`. Because OpenCode configures servers as `"enabled": false` by default, `agy-agents` must be force-enabled in `~/.omp/agent/mcp.json`:
-
-```json
-{
-  "enabledServers": [
-    "agy-agents"
-  ]
-}
-```
-
-In `~/.config/opencode/opencode.json`:
-```json
-{
-  "mcpServers": {
-    "agy-agents": {
-      "type": "remote",
-      "url": "http://192.168.50.10:7788/sse",
-      "enabled": false
-    }
-  }
-}
-```
-
-### Claude Desktop (`claude_desktop_config.json`)
-```json
-{
-  "mcpServers": {
-    "agy-agents": {
-      "url": "http://192.168.50.10:7788/sse"
-    }
-  }
-}
-```
+Autonomously modernizes and cleans Python code enforcing strict type hints, docstrings, and PEP 8 standards. Fast synchronous tool (5–15s).
+- **Parameters**:
+  - `code` (`str`, required): Python source code to refactor.
+  - `filename` (`str`, default `"target.py"`): Target filename hint used for structural context.
+  - `instructions` (`str | None`, default `None`): Custom refactoring instructions.
 
 ---
 
 ## Direct CLI Usage
 
-### Deep Research Council
+### Deep Research Council (`.md` Output Only)
 
 ```bash
-# Run research on an existing prompt stem
-uv run python deep-research/deep-research.py Direction_of_JPY
-
-# Results saved to deep-research/reports/:
-# - Direction_of_JPY_YYYYMMDD_HHMM.md (Full whitepaper)
-# - Direction_of_JPY_YYYYMMDD_HHMM.pdf / .html / .docx
-# - Direction_of_JPY_YYYYMMDD_HHMM_raw.json (Sandbox steps)
+# Run research on a prompt stem via LiteRouter
+uv run python deep-research/deep-research.py Direction_of_JPY --provider literouter
 ```
 
 ### Python Code Refactor
@@ -141,19 +103,7 @@ uv run python refactor/refactor.py path/to/script.py --prompt "Migrate to Pydant
 
 # Overwrite in-place
 uv run python refactor/refactor.py path/to/script.py --inplace
-
-# Batch processing via manifests
-uv run python refactor/refactor.py
 ```
-
-### Refactoring Safety Guidelines
-
-When executing code refactoring:
-1. **Read before edit**: Always inspect existing code and invariants first.
-2. **Strict Python syntax**: Verify AST syntax before writing back to disk.
-3. **Preserve business logic**: Refactor structure, type annotations, and docstrings; do not alter functional guarantees.
-4. **Present unified diffs**: Always review diffs after refactoring.
-5. **Run test suites**: Run unit and integration tests (`uv run python -m unittest`) to prove zero regressions.
 
 ---
 

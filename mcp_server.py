@@ -468,10 +468,12 @@ def _run_research_worker(
 mcp = FastMCP(
     "agy-agents",
     instructions=(
-        "Autonomous Deep Research Council and Code Refactoring Agent Server. "
-        "Provides asynchronous deep research job coordination (prepare_research_prompt, "
-        "start_research, get_research_status) to avoid client timeouts, plus fast "
-        "synchronous code refactoring (refactor_code), prompt discovery, and gateway health inspection."
+        "Autonomous Deep Research Council and Code Refactoring Agent Wrapper. "
+        "HOW IT WORKS: (1) Prepare or select a research prompt in deep-research/prompts/<stem>.md "
+        "via prepare_research_prompt or start_research. (2) Trigger the CLI command "
+        "`uv run python deep-research/deep-research.py <stem>` via your bash tool (do NOT use & or nohup). "
+        "(3) The CLI blocks until research completes, exits with exit code 0 to wake the LLM up, and "
+        "prints the exact path to the generated Markdown (.md) report in deep-research/reports/."
     ),
 )
 
@@ -480,8 +482,9 @@ mcp = FastMCP(
     name="prepare_research_prompt",
     description=(
         "Generate and validate an institutional Citi-grade 5-persona research prompt file. "
-        "Saves the prompt into deep-research/prompts/<stem>.md and returns the file path, "
-        "a preview, and the exact background CLI command so terminal agents can run it directly."
+        "Saves the prompt into deep-research/prompts/<stem>.md and returns instructions on how "
+        "the workflow operates plus the exact CLI command to trigger so the LLM wakes up on exit code 0 "
+        "to collect the .md report."
     ),
 )
 def prepare_research_prompt(
@@ -499,7 +502,7 @@ def prepare_research_prompt(
         description="Optional specific research guidelines, scope limits, or focus domains",
     ),
 ) -> str:
-    """Crafts and saves a tailored 5-persona research prompt."""
+    """Crafts and saves a tailored 5-persona research prompt and returns CLI trigger instructions."""
     topic = _unwrap_field(topic, "")
     prompt_stem = _unwrap_field(prompt_stem, "custom_research")
     custom_rubric = _unwrap_field(custom_rubric, None)
@@ -517,33 +520,36 @@ def prepare_research_prompt(
     target_file.write_text(prompt_content, encoding="utf-8")
 
     cli_command = f"uv run python deep-research/deep-research.py {clean_stem}"
-    bg_command = f"nohup {cli_command} > {clean_stem}.log 2>&1 &"
 
     output = PromptPreparationOutput(
         prompt_stem=clean_stem,
         prompt_file_path=str(target_file),
         prompt_preview=prompt_content[:800] + "\n...",
         character_count=len(prompt_content),
-        cli_command=bg_command,
+        cli_command=cli_command,
     )
 
     return (
         f"### Research Prompt Prepared: `{output.prompt_stem}`\n\n"
-        f"- **File:** `{output.prompt_file_path}`\n"
-        f"- **Size:** {output.character_count:,} characters\n"
-        f"- **Run in Background (CLI):**\n"
-        f"  ```bash\n  {output.cli_command}\n  ```\n"
-        f"- **Or Launch via MCP Tool:** Call `start_research(prompt_stem_or_topic='{output.prompt_stem}')`\n\n"
-        f"#### Preview\n```markdown\n{output.prompt_preview}\n```"
+        f"- **Prompt File:** `{output.prompt_file_path}` ({output.character_count:,} chars)\n\n"
+        f"#### 1. How It Works\n"
+        f"- The 5-persona Deep Research Council runs against `/v1beta/interactions` (`antigravity-preview-09-2026`).\n"
+        f"- It synthesizes the final report **only in Markdown (`.md`) format** inside `{REPORTS_DIR}/`.\n\n"
+        f"#### 2. Trigger the CLI Now\n"
+        f"Run this exact command using your `bash` tool (do **not** append `&` or `nohup`, and set `timeout: 600`):\n"
+        f"```bash\n{output.cli_command}\n```\n"
+        f"- When the CLI finishes, it exits with **exit code `0`** (which automatically wakes you up if backgrounded by your harness) and prints `📄 COLLECT MARKDOWN REPORT AT: <path>.md`.\n"
+        f"- Read that `.md` file path directly to consume the report.\n\n"
+        f"#### Prompt Preview\n```markdown\n{output.prompt_preview}\n```"
     )
 
 
 @mcp.tool(
     name="start_research",
     description=(
-        "Launch an autonomous 5-persona deep research council in the background. "
-        "Returns immediately with a unique job_id (avoids 60s client timeouts). "
-        "Use get_research_status(job_id) to poll progress and retrieve artifacts."
+        "Instruction wrapper to prepare a research topic/stem and get the exact CLI command "
+        "to trigger the 5-persona deep research run. The CLI exits with exit code 0 when done "
+        "and prints the exact .md report path to collect."
     ),
 )
 def start_research(
@@ -566,7 +572,7 @@ def start_research(
         description="Max execution time in seconds (default: 600.0)",
     ),
 ) -> str:
-    """Spawns non-blocking research worker and returns job ID immediately."""
+    """Prepares the prompt if needed and returns instructions for the LLM to trigger the CLI."""
     prompt_stem_or_topic = _unwrap_field(prompt_stem_or_topic, "")
     prompt_stem = _unwrap_field(prompt_stem, "custom_research")
     custom_rubric = _unwrap_field(custom_rubric, None)
@@ -584,15 +590,16 @@ def start_research(
 
     if potential_file.exists():
         effective_stem = clean_target
-        prompt_content = potential_file.read_text(encoding="utf-8")
+        prompt_file_path = potential_file
     else:
         effective_stem = _clean_stem(req.prompt_stem)
         prompt_content = _sculpt_5_persona_prompt(
             req.prompt_stem_or_topic, req.custom_rubric
         )
-        target_file = PROMPTS_DIR / f"{effective_stem}.md"
-        target_file.write_text(prompt_content, encoding="utf-8")
+        prompt_file_path = PROMPTS_DIR / f"{effective_stem}.md"
+        prompt_file_path.write_text(prompt_content, encoding="utf-8")
 
+    cli_command = f"uv run python deep-research/deep-research.py {effective_stem}"
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     initial_job_data = {
         "job_id": job_id,
@@ -607,43 +614,40 @@ def start_research(
     }
     _save_job_state(job_id, initial_job_data)
 
-    worker_thread = threading.Thread(
-        target=_run_research_worker,
-        args=(job_id, prompt_content, effective_stem, req.timeout_seconds),
-        daemon=True,
-    )
-    worker_thread.start()
-
     output = StartResearchOutput(
         job_id=job_id,
         status="running",
         prompt_stem=effective_stem,
-        message="Research council dispatched in background. Execution takes ~3-8 minutes.",
-        check_status_command=f"get_research_status(job_id='{job_id}')",
+        message=(
+            "Prompt ready. Trigger the CLI command below via your bash tool. "
+            "The CLI exits with code 0 when finished and prints the exact .md report path to collect."
+        ),
+        check_status_command=cli_command,
     )
 
     return (
-        f"### Research Dispatched: `{output.job_id}`\n\n"
-        f"- **Status:** `{output.status}`\n"
-        f"- **Prompt Stem:** `{output.prompt_stem}`\n"
-        f"- **Message:** {output.message}\n"
-        f"- **Polling Tool:** Call `{output.check_status_command}` to inspect progress and artifacts."
+        f"### Deep Research Instructions (`{output.job_id}` | Stem: `{output.prompt_stem}`)\n\n"
+        f"#### 1. How It Works\n"
+        f"- Your research prompt is saved at `{prompt_file_path}`.\n"
+        f"- Deep research runs via the CLI script `deep-research/deep-research.py`, which dispatches the 5-persona council to `/v1beta/interactions` and writes the final report **only in `.md` format** to `{REPORTS_DIR}/{output.prompt_stem}_<YYYYMMDD_HHMM>.md`.\n\n"
+        f"#### 2. Trigger the CLI Now\n"
+        f"Execute this command with your `bash` tool (use `timeout: {int(req.timeout_seconds)}`, do **not** use `&` or `nohup`):\n"
+        f"```bash\n{cli_command}\n```\n\n"
+        f"#### 3. Wake-Up & Collect Report (`.md` Only)\n"
+        f"- When the CLI finishes, it exits with **exit code `0`**, waking you up with verbose output containing:\n"
+        f"  `📄 COLLECT MARKDOWN REPORT AT: {REPORTS_DIR}/{output.prompt_stem}_<YYYYMMDD_HHMM>.md`\n"
+        f"- Once woken by exit code `0`, read that `.md` file directly (or call `get_research_status(job_id='{output.prompt_stem}')`) to consume the report."
     )
 
 
 def _find_latest_report_by_stem(stem_or_id: str) -> dict[str, Any] | None:
-    """Finds the latest completed report matching a prompt stem in REPORTS_DIR."""
+    """Finds the latest completed .md report matching a prompt stem in REPORTS_DIR."""
     clean = _clean_stem(stem_or_id)
     md_matches = sorted(REPORTS_DIR.glob(f"{clean}_*.md"))
     if not md_matches:
         return None
     latest_md = md_matches[-1]
-    prefix = latest_md.stem  # e.g. Direction_of_JPY_20260729_0826
-    artifacts = [
-        str(p)
-        for p in sorted(REPORTS_DIR.glob(f"{prefix}*"))
-        if not p.name.endswith("_raw.json")
-    ]
+    prefix = latest_md.stem
     raw_json = REPORTS_DIR / f"{prefix}_raw.json"
     summary = _extract_summary_from_report(latest_md, None)
     return {
@@ -652,7 +656,7 @@ def _find_latest_report_by_stem(stem_or_id: str) -> dict[str, Any] | None:
         "prompt_stem": clean,
         "elapsed_seconds": 0.0,
         "report_path": str(latest_md),
-        "artifacts": artifacts,
+        "artifacts": [str(latest_md)],
         "summary": summary,
         "raw_json_path": str(raw_json) if raw_json.exists() else None,
         "error": None,
@@ -662,21 +666,26 @@ def _find_latest_report_by_stem(stem_or_id: str) -> dict[str, Any] | None:
 @mcp.tool(
     name="get_research_status",
     description=(
-        "Check progress of a running research job or retrieve executive summary, "
-        "full Markdown report, and downloaded artifacts (.md, .html, .pdf, .docx) once completed."
+        "Retrieve the latest completed Markdown (.md) report for a prompt stem or job_id, "
+        "including executive summary, full Markdown report text, and exact .md file location."
     ),
 )
 def get_research_status(
     job_id: str = Field(
         ...,
         min_length=1,
-        description="Unique job ID returned by start_research (or a prompt stem like 'Direction_of_JPY' to fetch its latest completed report)",
+        description="Prompt stem (e.g. 'Direction_of_JPY') or job ID returned by start_research",
     ),
 ) -> str:
-    """Queries current progress or completed results of a background research job."""
+    """Queries the latest .md report or job status for a research stem/job_id."""
     job_id = _unwrap_field(job_id, "")
     req = ResearchStatusInput(job_id=job_id)
-    job_data = _load_job_state(req.job_id) or _find_latest_report_by_stem(req.job_id)
+    job_data = _find_latest_report_by_stem(req.job_id)
+    if not job_data:
+        loaded = _load_job_state(req.job_id)
+        if loaded:
+            stem_report = _find_latest_report_by_stem(loaded.get("prompt_stem", ""))
+            job_data = stem_report if stem_report else loaded
 
     if not job_data:
         return f"Error: Job ID `{req.job_id}` was not found in `.jobs/` registry."

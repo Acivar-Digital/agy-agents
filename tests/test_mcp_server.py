@@ -138,7 +138,8 @@ class TestMCPToolsExecution(unittest.TestCase):
         )
         self.assertIn("Research Prompt Prepared", res)
         self.assertIn(self.test_stem, res)
-        self.assertIn("nohup uv run python deep-research/deep-research.py", res)
+        self.assertIn("uv run python deep-research/deep-research.py", res)
+        self.assertNotIn("nohup uv run", res)
         self.assertTrue(self.test_prompt_file.exists())
 
         content = self.test_prompt_file.read_text(encoding="utf-8")
@@ -187,7 +188,8 @@ class TestMCPToolsExecution(unittest.TestCase):
             prompt_stem=tmp_stem,
             timeout_seconds=10.0,
         )
-        self.assertIn("Research Dispatched", res_start)
+        self.assertIn("Deep Research Instructions", res_start)
+        self.assertIn("uv run python deep-research/deep-research.py", res_start)
         self.assertIn("get_research_status", res_start)
 
         # Extract job_id

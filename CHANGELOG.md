@@ -8,13 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.0] - 2026-10-08
 
 ### Added
+- **Simplified MCP Instruction & CLI-Trigger Wrapper**: Streamlined `prepare_research_prompt` and `start_research` in `mcp_server.py` to act as pure instruction wrappers that (1) explain how the 5-persona research workflow operates and (2) instruct the LLM to trigger `uv run python deep-research/deep-research.py <stem>` directly so the script exits with exit code `0` (waking the LLM up automatically) and prints the exact `.md` report path to collect.
+- **Markdown-Only (`.md`) Output & Fast Execution**: Removed slow sandbox `pip install` and HTML/PDF/DOCX compilation from `deep-research.py`, cutting research execution time below 210s and eliminating 360s gateway timeouts.
+- **Preserved `InteractionStep.content` Extraction**: Added explicit `type` and `content` fields to `InteractionStep` so multi-part `model_output` steps are preserved and extracted directly into `deep-research/reports/<stem>_<timestamp>.md`.
 - **Dual-Transport MCP Network Endpoint**: Implemented dual-transport routing in `mcp_server.py` supporting Streamable HTTP (`POST /sse` and `POST /mcp`) for `omp` (`type: remote`) alongside Server-Sent Events (`GET /sse`) and HEAD health probes.
-- **In-Band Markdown Report Delivery**: Enhanced `get_research_status` to embed the complete Markdown report (`report.md`) directly in the tool response (`#### Full Markdown Report`), enabling client LLMs to ingest deep research reports instantly without filesystem dependencies.
-- **LAN HTTP Artifact Serving**: Added `GET /reports/{filename}` route to `agy-mcp` on port `:7788`, allowing LAN agents and browsers to directly fetch `.md`, `.html`, `.pdf`, and `.docx` artifacts via `http://agy-agents.lan:7788/reports/...`.
-- **Stem-Based Job Lookup Fallback**: `get_research_status` now accepts topic stems (e.g. `Direction_of_JPY`) to automatically resolve and deliver the most recent completed run for that topic.
-- **Interaction Step Extraction Fallback**: `deep-research.py` now extracts Markdown text directly from `InteractionStep` content blocks in raw interactions if the remote Antigravity sandbox does not produce a separate `report.md` artifact file.
-- **Comprehensive FastMCP Test Suite**: Added Starlette `TestClient` tests covering Streamable HTTP, SSE, HEAD probes, static `/reports/{filename}` serving, and in-band Markdown extraction in `tests/test_mcp_server.py`.
-- **Skill Documentation v1.3.0**: Completely updated `.opencode/skills/agy-agents/SKILL.md` covering the 6 sovereign MCP tools, dual-transport endpoints, artifact consumption channels, and `omp` / `OpenCode` configuration patterns.
+- **In-Band Markdown Report & LAN HTTP Serving**: `get_research_status` returns the full `.md` report in-band and `GET /reports/{filename}` serves `.md` reports over HTTP on `:7788`.
+- **Skill Documentation v1.3.0**: Updated `.opencode/skills/agy-agents/SKILL.md` with exact `mcp_server.py` parameter signatures and the simplified CLI-trigger `.md`-only workflow.
 
 ## [1.2.0] - 2026-10-07
 
