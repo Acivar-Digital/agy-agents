@@ -1,190 +1,216 @@
-# antigravity-agents (agy-agents)
+<div align="center">
 
-Autonomous, institutional-grade Deep Research and Code Refactoring agents powered by Google's Antigravity sandbox (`antigravity-preview-09-2026`) via the `/v1beta/interactions` endpoint.
+# 🌌 antigravity-agents (`agy-agents`)
 
-Built for the open-source community: plug in your standard **Google Gemini API Key** and run immediately, or route through a self-hosted **LiteRouter** inference gateway.
+**Autonomous Deep Research Council & Self-Directed Code Refactoring Agents**  
+*Powered by Google's Antigravity Sandbox (`antigravity-preview-09-2026`) via Google Gemini API & LiteRouter Gateway*
 
----
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg?style=flat-square)](https://github.com/Acivar-Digital/agy-agents/releases)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-brightgreen.svg?style=flat-square)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Dual Engine](https://img.shields.io/badge/Engine-Gemini%20API%20%7C%20LiteRouter-orange.svg?style=flat-square)](https://aistudio.google.com/)
+[![MCP Ready](https://img.shields.io/badge/Architecture-MCP%20Ready-purple.svg?style=flat-square)](https://modelcontextprotocol.io/)
 
-## ⚡ Highlights
-
-- **🔬 Deep Research (Council Protocol)**: Multi-persona research council synthesizing live web data into fully cited whitepapers, with automatic sandbox compilation into Markdown, HTML, PDF, and DOCX formats.
-- **🛠️ Autonomous Code Refactoring**: Dual-mode pipeline (CLI file argument or JSON manifests) that analyzes codebases, enforces clean architecture and PEP 8, and generates verified refactored code.
-- **🌐 Dual-Engine Execution**:
-  - **Public Community Mode (Default)**: Direct connection to Google Gemini API (`https://generativelanguage.googleapis.com`) using `GEMINI_API_KEY`.
-  - **Self-Hosted Mode**: Route through your private LiteRouter inference gateway using `LITEROUTER_AUTH_KEY`.
-- **🔌 MCP & Automation Ready**: Core execution functions (`execute_research`, `execute_refactor`) are cleanly exported for seamless integration into Model Context Protocol (MCP) servers or Python pipelines.
+</div>
 
 ---
 
-## 🚀 Quick Start (Community / Gemini API)
+## 📖 About `agy-agents`
 
-### 1. Prerequisites
-- Python 3.10+
-- Recommended: [uv](https://docs.astral.sh/uv/) (fast Python package runner) or standard `pip`
-- A Google Gemini API Key ([get one from Google AI Studio](https://aistudio.google.com/))
+**`agy-agents`** is an open-source framework of autonomous AI agent workflows designed for institutional-grade intelligence gathering and production-ready code modernization. Built directly on Google's stateful **Antigravity Sandbox** environment (`/v1beta/interactions`), it delivers capabilities beyond standard single-turn LLM chat completions:
 
-### 2. Setup
-Clone the repository and set your API key:
+1. **🔬 Deep Research (Council Protocol)**: Automatically orchestrates a multi-perspective panel of 5 specialized expert personas (e.g., Quantitative Analyst, Macro Strategist, Systems Architect, Risk Specialist, and Adversarial Skeptic). The council searches live web data, verifies empirical evidence, resolves internal contradictions, and compiles whitepapers natively rendered into **Markdown, HTML, PDF, and Word (.docx)** formats.
+2. **🛠️ Autonomous Code Refactoring**: Analyzes real-world codebases to enforce PEP 8 standards, strict type annotations, architectural decoupling, and helper extraction. Operates in two modes: **surgical single-file CLI** or **batch manifest pipelines** with shared reference contexts.
+3. **🌐 Dual-Engine Inference**:
+   - **Public Community Mode (Default)**: Out-of-the-box connectivity to the Google Gemini API using a standard `GEMINI_API_KEY`.
+   - **Self-Hosted Mode**: Direct routing through a private [LiteRouter](https://github.com/gastownhall/literouter) LAN gateway (`http://literouter.lan:7766`) using `LITEROUTER_AUTH_KEY`.
+4. **🔌 MCP & Pipeline Ready**: Zero CLI lock-in. Both tools export cleanly decoupled core functions (`execute_research` and `execute_refactor`) ready for integration into custom Python pipelines or [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server tools.
 
+---
+
+## 📦 Packages & Installation
+
+`agy-agents` is designed for rapid installation via `pip` or [uv](https://docs.astral.sh/uv/):
+
+### Option A: Install from Git (Recommended)
 ```bash
-git clone https://github.com/your-username/agy-agents.git
+# Using standard pip
+pip install git+https://github.com/Acivar-Digital/agy-agents.git
+
+# Using uv
+uv pip install git+https://github.com/Acivar-Digital/agy-agents.git
+```
+
+### Option B: Local Developer Clone
+```bash
+git clone https://github.com/Acivar-Digital/agy-agents.git
 cd agy-agents
 
-# Copy environment template
+# Copy environment configuration
 cp .env.example .env
 ```
 
-Open `.env` and set your key:
-```ini
-GEMINI_API_KEY=AIzaSy...your_gemini_api_key_here
-```
-
-Install dependencies (if using pip):
+Install local dependencies:
 ```bash
 pip install -r requirements.txt
-# Or simply use `uv run` which handles dependencies automatically!
+# Or run scripts directly with uv (uv automatically handles environment and dependencies)
 ```
 
 ---
 
-## 🔬 1. Running Deep Research
+## 🚀 Quick Start Guide
 
-The Deep Research agent executes a structured 5-persona research council across live web sources, synthesizes the findings, and renders native reports in Markdown, HTML, PDF, and Word document formats inside its execution sandbox.
+### 1. Configure Environment (`.env`)
 
-```bash
-# 1. Create a prompt for your research topic
-cp deep-research/prompts/_template_guide.md deep-research/prompts/My_Topic.md
+Add your API credentials to `.env`:
 
-# 2. Edit My_Topic.md to define your research question and 5 personas
+```ini
+# --- Option A: Public Community Mode (Google Gemini API) ---
+GEMINI_API_KEY=AIzaSy...your_gemini_api_key_here
 
-# 3. Execute research
-uv run python deep-research/deep-research.py My_Topic
+# --- Option B: Self-Hosted Mode (LiteRouter Gateway) ---
+# LITEROUTER_HOST=literouter.lan
+# LITEROUTER_PORT=7766
+# LITEROUTER_AUTH_KEY=your_literouter_key_here
 ```
-
-Reports are automatically generated and extracted into `deep-research/reports/`:
-- `My_Topic_TIMESTAMP.md`
-- `My_Topic_TIMESTAMP.html`
-- `My_Topic_TIMESTAMP.pdf`
-- `My_Topic_TIMESTAMP.docx`
-- `My_Topic_TIMESTAMP_raw.json`
 
 ---
 
-## 🛠️ 2. Running Autonomous Refactoring
+### 2. Deep Research Workflow
 
-The refactoring agent inspects code, applies strict typing, architectural decoupling, and PEP 8 best practices.
-
-### Mode A: Refactor a Single File Directly
 ```bash
-# Refactors the file and outputs path/to/script_refactored.py
+# 1. Create a prompt template
+cp deep-research/prompts/_template_guide.md deep-research/prompts/Quantum_Computing.md
+
+# 2. Edit Quantum_Computing.md with your research question and 5 tailored personas
+
+# 3. Run the research agent
+uv run python deep-research/deep-research.py Quantum_Computing
+```
+
+The agent runs live web sprints, aggregates findings, executes supervisor reviews, and compiles four artifact formats in `deep-research/reports/`:
+- `Quantum_Computing_YYYYMMDD_HHMM.md`
+- `Quantum_Computing_YYYYMMDD_HHMM.html`
+- `Quantum_Computing_YYYYMMDD_HHMM.pdf`
+- `Quantum_Computing_YYYYMMDD_HHMM.docx`
+
+---
+
+### 3. Autonomous Refactoring Workflow
+
+#### Mode A: Surgical Single-File Execution
+```bash
+# Refactor and save to path/to/script_refactored.py
 uv run python refactor/refactor.py path/to/script.py
 
-# Optional: supply custom prompt instructions on the fly
-uv run python refactor/refactor.py path/to/script.py --prompt "Convert this script to use async/await and Pydantic v2"
+# Optional: provide custom inline refactoring prompt
+uv run python refactor/refactor.py path/to/script.py --prompt "Refactor to Pydantic v2 schemas and strict async/await"
 
-# Optional: overwrite the file in-place
+# Optional: overwrite the target file in-place
 uv run python refactor/refactor.py path/to/script.py --inplace
 ```
 
-### Mode B: Batch Processing via Manifests
-For large codebases, define targeted refactoring jobs in `refactor/manifests/*.json`:
+#### Mode B: Batch Manifest Pipeline
 ```bash
-# Runs all manifests concurrently with staggered execution
+# Process all manifests in refactor/manifests/*.json concurrently
 uv run python refactor/refactor.py
 
-# Or run a single specific manifest
-uv run python refactor/refactor.py --manifest refactor/manifests/my_batch.json
+# Or process a specific manifest
+uv run python refactor/refactor.py --manifest refactor/manifests/template.json
 ```
 
 ---
 
-## 💡 Pro-Tip: Use Your LLM to Customize Everything
+## 🤖 Use Your LLM to Customize Everything
 
-This repository is designed to be a flexible foundation. **You should ask your favorite LLM (Claude, ChatGPT, Gemini, or OpenCode) to tailor it to your exact needs!**
+This repository provides an open architecture. **We encourage you to use your favorite LLM (Claude, ChatGPT, Gemini, or OpenCode) to adapt the personas, rules, and manifests to your specific project needs!**
 
-Here are recommended prompts you can copy-paste into your LLM:
+### 💡 Copy-Paste Prompt 1: Tailor Research Personas
+> *"I am researching [INSERT TOPIC HERE]. Review `deep-research/prompts/_template_guide.md` and generate a complete prompt file containing 5 distinct, adversarial expert personas (e.g. specialized domain engineer, macro economist, risk quant, contrarian skeptic, and regulatory analyst) with search objectives tailored to this topic."*
 
-### Customizing Research Personas
-> *"I want to conduct deep research on [YOUR DOMAIN, e.g. Quantum Computing / DeFi Protocols / Biotech]. Read `deep-research/prompts/_template_guide.md` and generate 5 specialized, adversarial personas representing top industry experts, along with a detailed prompt tailored for this domain."*
+### 💡 Copy-Paste Prompt 2: Tailor Refactoring Guidelines
+> *"Inspect `refactor/prompt.txt`. Refactor this system prompt to enforce our engineering team's standards: [e.g. enforce Google docstrings, Pydantic v2 data models, zero Any annotations, decoupled repository pattern, and FastAPI route best practices]."*
 
-### Customizing the Refactoring Rules
-> *"Read `refactor/prompt.txt`. Refactor this system prompt to enforce our engineering team's style guide: [list your rules, e.g., enforce FastAPI patterns, strict Pydantic v2 schemas, zero Any types, and Google docstrings]."*
-
-### Customizing Batch Manifests
-> *"Look at `refactor/manifests/template.json`. Generate a manifest targeting my repository in `/src` to refactor all database queries into repository pattern classes."*
+### 💡 Copy-Paste Prompt 3: Generate Batch Manifests
+> *"Review `refactor/manifests/template.json` and my codebase in `src/`. Generate a manifest JSON that targets our database query modules, provides `src/models.py` as a reference context, and refactors all queries to use SQLAlchemy 2.0 select statements."*
 
 ---
 
-## 🏠 Advanced: Self-Hosted / LiteRouter Gateway Mode
+## 🔌 Programmatic Python & MCP Server API
 
-If you run your own local or private inference gateway ([LiteRouter](https://github.com/gastownhall/literouter)), you can route all requests through your LAN gateway without changing code:
-
-In `.env`:
-```ini
-LITEROUTER_HOST=literouter.lan
-LITEROUTER_PORT=7766
-LITEROUTER_AUTH_KEY=your_literouter_key_here
-```
-
-The scripts automatically detect `LITEROUTER_AUTH_KEY`. You can also explicitly specify the provider via CLI:
-```bash
-uv run python deep-research/deep-research.py My_Topic --provider literouter
-uv run python refactor/refactor.py path/to/script.py --provider literouter
-```
-
----
-
-## 🔌 Python API & MCP Server Readiness
-
-Both tools export clean, modular functions ready to be embedded into custom pipelines or served via a Model Context Protocol (MCP) server:
+Both agent tools export cleanly modular functions for inclusion in custom applications or Model Context Protocol (MCP) servers:
 
 ```python
 from deep_research import execute_research
 from refactor import execute_refactor
 
-# Run research programmatically
-result = execute_research(
-    prompt_content="Analyze macroeconomic impact of rate cuts...",
-    prompt_stem="macro_analysis",
+# 1. Trigger Deep Research programmatically
+research_result = execute_research(
+    prompt_content="Analyze impact of liquid cooling in next-gen AI data centers...",
+    prompt_stem="data_center_cooling",
 )
-print(f"Report files: {result['extracted_files']}")
+print("Generated report artifacts:", research_result["extracted_files"])
 
-# Refactor code programmatically
-refactored = execute_refactor(
-    code_content="def add(a, b): return a + b",
-    prompt="Add complete type hints and docstrings.",
+# 2. Trigger Code Refactoring programmatically
+refactor_result = execute_refactor(
+    code_content="def calculate(data): return [x*2 for x in data if x > 0]",
+    prompt="Add complete type hints, Google docstrings, and input validation.",
 )
-print(refactored["refactored_code"])
+print("Refactored code:\n", refactor_result["refactored_code"])
 ```
 
 ---
 
-## 📂 Project Structure
+## 🏷️ Releases & Versioning
+
+### `v1.0.0` — Official Production Release *(2026-10-07)*
+- 🚀 **Initial Stable Release**: First public release of `agy-agents` framework.
+- 🔑 **Zero Hardcoded Secrets**: Clean credential design with strict `.gitignore` rules.
+- ⚡ **Dual-Engine Auto-Resolution**: Transparent auto-switching between public Google Gemini API (`GEMINI_API_KEY`) and self-hosted LiteRouter gateway (`LITEROUTER_AUTH_KEY`).
+- 📦 **Standardized Packaging**: `pyproject.toml` and `requirements.txt` configured with `hatchling` packaging for native `uv` and `pip` installation.
+- 🧩 **Modular Python Exports**: Standalone `execute_research()` and `execute_refactor()` APIs ready for Model Context Protocol (MCP) servers.
+- 🛠️ **Hybrid Refactoring CLI**: Direct single-file arguments and concurrent manifest processing with automatic markdown code fence stripping.
+- 📄 **Sandbox Multi-Format Extraction**: Automatic compilation and extraction of `.md`, `.html`, `.pdf`, and `.docx` report artifacts.
+
+---
+
+## 📁 Repository Structure
 
 ```
 agy-agents/
-├── .env.example             ← Unified environment variables template
-├── pyproject.toml           ← Standard project packaging
-├── requirements.txt         ← Dependencies (python-dotenv, httpx, h2)
+├── .env.example                    ← Universal environment template
+├── pyproject.toml                  ← PEP 621 package metadata & dependencies
+├── requirements.txt                ← Dependencies (python-dotenv, httpx, h2)
+├── deep_research.py                ← Modular programmatic import shim
 ├── deep-research/
-│   ├── deep-research.py     ← Dual-engine research runner & execute_research() export
-│   ├── run.sh               ← Batch runner script
+│   ├── deep-research.py            ← Deep research runner & execute_research()
+│   ├── run.sh                      ← Cron-friendly batch runner
+│   ├── README.md                   ← Deep research guide
 │   ├── prompts/
-│   │   ├── _template_guide.md ← Structural template for 5-persona prompts
-│   │   └── *.md             ← Topic prompts
-│   └── reports/             ← Generated reports (gitignored)
+│   │   ├── _template_guide.md      ← Prompt & 5-persona template
+│   │   └── *.md                    ← Topic prompt files
+│   └── reports/                    ← Generated reports (.md, .html, .pdf, .docx)
 ├── refactor/
-│   ├── refactor.py          ← Dual-engine hybrid refactorer & execute_refactor() export
-│   ├── prompt.txt           ← Default refactoring instructions
-│   ├── manifests/           ← Batch refactoring jobs
-│   └── reports/             ← Batch execution reports (gitignored)
-├── .opencode/skills/        ← Skill definitions for OpenCode / assistant agents
-└── README.md
+│   ├── __init__.py                 ← Package exports for programmatic refactoring
+│   ├── refactor.py                 ← Dual-engine hybrid refactorer
+│   ├── prompt.txt                  ← Default refactoring instructions
+│   ├── INSTRUCTIONS.md             ← Manifest workflow documentation
+│   ├── manifests/
+│   │   └── template.json           ← Manifest reference template
+│   └── reports/                    ← Batch reports (gitignored)
+├── .opencode/skills/agy-agents/    ← OpenCode / AI Assistant skill definitions
+└── README.md                       ← Project documentation
 ```
+
+---
+
+## 🔍 SEO & Topic Tags
+
+For GitHub repository maintainers, configure the following repository topics:  
+`ai-agents` • `deep-research` • `code-refactoring` • `google-gemini` • `antigravity` • `literouter` • `mcp` • `python` • `autonomous-agents` • `llm-tools`
 
 ---
 
 ## 📄 License
 
-MIT License. Free to use, adapt, and share with the open-source community.
+Distributed under the **MIT License**. See `LICENSE` for full details. Open to the global AI and developer community.
