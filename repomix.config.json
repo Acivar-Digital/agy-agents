@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/yamadashy/repomix/main/repomix.schema.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "parsableStyle": true,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "showLineNumbers": true,
+    "topFilesLength": 10
+  },
+  "include": [
+    "**/*"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      ".venv/**",
+      "__pycache__/**",
+      "*.pyc",
+      ".jobs/**",
+      "deep-research/reports/**",
+      "refactor/output/**",
+      "*.tar",
+      "*.tar.gz",
+      ".beads/**",
+      "*.log",
+      ".env",
+      ".env.*"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

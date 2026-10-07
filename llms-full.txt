@@ -1,0 +1,126 @@
+# agy-agents: Complete Reference Manual & LLM Context Document
+
+> `agy-agents` is an open-source framework for autonomous deep research and automated code refactoring, interfacing directly with Google Antigravity (`antigravity-preview-09-2026`) via the `/v1beta/interactions` API.
+
+---
+
+# SECTION 1: ARCHITECTURAL BLUEPRINT & SYSTEM TOPOLOGY
+
+## 1.1 Overview
+`agy-agents` supports dual-engine inference:
+1. **Public Community Engine (Direct Google Gemini API)**: `https://generativelanguage.googleapis.com/v1beta/interactions` using `GEMINI_API_KEY`.
+2. **Self-Hosted Engine (LiteRouter Gateway)**: `http://{LITEROUTER_HOST}:{LITEROUTER_PORT}/v1beta/interactions` using `LITEROUTER_AUTH_KEY`.
+
+Antigravity operates in a remote sandbox (`environment: "remote"`) capable of live Google searches, compiler tool execution, and compiling research outputs directly into `.md`, `.html`, `.pdf`, and `.docx` artifacts, packed into a `.tar` snapshot.
+
+## 1.2 Wire Protocol & Endpoint Contract
+- **Endpoint**: `POST /v1beta/interactions`
+- **Payload Schema**:
+  ```json
+  {
+    "agent": "antigravity-preview-09-2026",
+    "input": "...",
+    "environment": "remote"
+  }
+  ```
+- **Prohibition**: NEVER use OpenAI `/v1/chat/completions` or Gemini `:generateContent`. Antigravity only supports the Interactions API.
+
+## 1.3 Architecture Components
+- **Interface Layer**:
+  - `mcp_server.py`: FastMCP server (`agy-mcp`) exposing 6 sovereign tools.
+  - CLI Runners: `agy-research` (`deep-research/deep-research.py`) and `agy-refactor` (`refactor/refactor.py`).
+  - Programmatic APIs: `from deep_research import execute_research` and `from refactor import execute_refactor`.
+- **Async Execution Subsystem**:
+  - Standard MCP clients enforce a 60-second RPC timeout.
+  - Deep research runs take 3–8 minutes.
+  - `mcp_server.py` implements a hybrid async pattern: `start_research` returns an atomic `job_id` (<1s), while a daemon thread executes research in the background and writes state to `.jobs/<job_id>.json`. Clients poll via `get_research_status(job_id)`.
+
+---
+
+# SECTION 2: MASTER AGENT GUIDELINES & INVARIANTS (AGENTS.MD)
+
+## 2.1 Repository Conventions
+- Environment configuration: `.env` loaded from root or script directory.
+- Pydantic V2 models: `pydantic>=2.10.0` with `model_config = ConfigDict(extra="forbid", validate_assignment=True)`.
+- Python 3.10+ syntax: `X | None` unions, `list[str]`, `dict[str, Any]`. Avoid Python 3.12 PEP 695 `type X = ...`.
+
+## 2.2 Dual-Engine Provider Resolution
+The provider resolver `get_provider_config("auto")` inspects:
+1. `PROVIDER` env var (`literouter` or `gemini`).
+2. If unset, checks `GEMINI_API_KEY` (Gemini API) -> `LITEROUTER_AUTH_KEY` (LiteRouter LAN) -> defaults to LiteRouter LAN on `literouter.lan:7766` or `127.0.0.1:7766`.
+
+---
+
+# SECTION 3: FASTMCP TOOL REFERENCE (MCP_SERVER.PY)
+
+The FastMCP server exposes 6 sovereign tools:
+
+1. `prepare_research_prompt(topic: str, prompt_stem: str = "custom_research", custom_rubric: str | None = None) -> str`
+   - Generates structured 5-persona research prompt file in `deep-research/prompts/` and returns preview.
+2. `start_research(topic: str, prompt_stem: str = "custom_research", custom_rubric: str | None = None, timeout_seconds: float = 600.0) -> str`
+   - Non-blocking async execution. Spawns background worker thread, registers in `.jobs/`, and returns `{job_id, status: "running"}` in <1 second.
+3. `get_research_status(job_id: str) -> str`
+   - Non-blocking status poller. Returns current state, elapsed runtime, and upon completion returns executive summary and artifact paths.
+4. `refactor_code(code: str, filename: str = "target.py", instructions: str | None = None) -> str`
+   - Synchronous refactoring (<30s). Strips Markdown fences, validates Python syntax, and returns clean PEP 8 code.
+5. `list_research_prompts() -> str`
+   - Lists available structured prompt templates in `deep-research/prompts/`.
+6. `check_gateway_health() -> str`
+   - Tests HTTP/HTTPS connectivity to active inference gateway and returns latency and configuration details.
+
+---
+
+# SECTION 4: CODE REFACTORING PIPELINE (REFACTOR/INSTRUCTIONS.MD)
+
+## 4.1 CLI Execution Modes
+- Direct File Mode:
+  ```bash
+  uv run python refactor/refactor.py path/to/script.py
+  uv run python refactor/refactor.py path/to/script.py --inplace
+  ```
+- Batch Manifest Mode:
+  ```bash
+  uv run python refactor/refactor.py
+  uv run python refactor/refactor.py --manifest refactor/manifests/my_task.json
+  ```
+
+## 4.2 Manifest Schema (`refactor/manifests/*.json`)
+```json
+{
+  "targets": ["src/engine/resolver.py"],
+  "reference_files": ["src/engine/models.py"],
+  "prompt": "You are a Senior Python Engineer...\nRefactor to clean architecture, enforce type safety.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}
+```
+
+---
+
+# SECTION 5: DEEP RESEARCH COUNCIL PROTOCOL (DEEP-RESEARCH)
+
+## 5.1 Council Methodology
+A 5-persona research council operates inside the Antigravity remote sandbox:
+- **Phase 1: 50-Source Research Sprint**: 5 personas independently execute 10+ Google searches each (50 distinct sources minimum).
+- **Phase 2: Aggregator**: Lead Editor synthesizes dossiers into a comprehensive draft preserving granular metrics, formulas, and pricing.
+- **Phase 3: Committee Vote & Revision**: Council scores draft against rubric (target >=4.8/5.0); exactly 1 revision cycle if rubric not met.
+- **Phase 4: Multi-Format Compilation**: Remote sandbox compiles whitepaper into Markdown, HTML, PDF, and DOCX.
+
+---
+
+# SECTION 6: DETERMINISTIC VERIFICATION PRIMITIVES
+
+Always run these deterministic commands to verify changes:
+```bash
+# 1. MCP Unit & Integration Suite
+uv run python -m unittest tests/test_mcp_server.py
+
+# 2. Check Gateway Connectivity
+uv run python -c "import mcp_server; print(mcp_server.check_gateway_health())"
+
+# 3. List Research Prompts
+uv run python -c "import mcp_server; print(mcp_server.list_research_prompts())"
+
+# 4. Entrypoint Verification
+uv run agy-mcp --help
+```

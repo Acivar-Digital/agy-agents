@@ -10,8 +10,42 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Dual Engine](https://img.shields.io/badge/Engine-Gemini%20API%20%7C%20LiteRouter-orange.svg?style=flat-square)](https://aistudio.google.com/)
 [![MCP Ready](https://img.shields.io/badge/Architecture-MCP%20Ready-purple.svg?style=flat-square)](https://modelcontextprotocol.io/)
+[![llms.txt](https://img.shields.io/badge/llms.txt-Standard-green.svg?style=flat-square)](llms.txt)
+[![GitIngest](https://img.shields.io/badge/GitIngest-Digest%20Repo-blue.svg?style=flat-square)](https://gitingest.com/Acivar-Digital/agy-agents)
 
 </div>
+
+---
+
+## 🤖 AI & LLM Integration
+
+This repository is optimized for AI assistants, autonomous coding agents, and automated context ingestion:
+
+* **Machine Discovery ([llms.txt](llms.txt))**: Curated Markdown index for LLMs based on the [Answer.AI specification](https://llmstxt.org).
+* **Full Context Document ([llms-full.txt](llms-full.txt))**: Aggregated reference manual for large-context models (Claude, ChatGPT, Gemini).
+* **System Architecture ([ARCHITECTURE.md](ARCHITECTURE.md))**: Mermaid topology diagrams, execution sequences, and verification primitives.
+* **Agent Master Guidelines ([AGENTS.md](AGENTS.md))**: Rules, schema constraints, and endpoint contracts for autonomous agents.
+* **Claude Code Config ([CLAUDE.md](CLAUDE.md))**: Direct memory file and development invariants for the Anthropic Claude CLI.
+
+### 📦 Ingestion & Packaging Helpers
+
+- **One-Click Ingestion**: Ingest this repository into Claude or ChatGPT with a single click using [GitIngest](https://gitingest.com/Acivar-Digital/agy-agents).
+- **Repomix Packaging**: Package the codebase into an AI-optimized XML context file with token counts:
+  ```bash
+  # Generate repomix-output.xml using repomix.config.json
+  npx repomix
+  ```
+
+### 💬 LLM Quickstart Prompt
+
+When working with an AI assistant on this repository, paste this prompt for instant orientation:
+
+> "I am working on the **agy-agents** repository (https://github.com/Acivar-Digital/agy-agents).
+> - **Context**: Autonomous multi-persona deep research and automated Python code refactoring connected to Google Antigravity (`antigravity-preview-09-2026`).
+> - **Endpoint Contract**: Strictly use `POST /v1beta/interactions` with `{'agent': 'antigravity-preview-09-2026', 'input': '...', 'environment': 'remote'}`. NEVER use `/v1/chat/completions` or `:generateContent`.
+> - **Tech Stack**: Python 3.10+, uv, Pydantic V2 (`extra='forbid'`), FastMCP (`agy-mcp`).
+> - **Verification**: Run `uv run python -m unittest tests/test_mcp_server.py` before declaring any work complete.
+> - **Architecture**: Follow `ARCHITECTURE.md` and `AGENTS.md` for design invariants."
 
 ---
 
@@ -145,9 +179,106 @@ This repository provides an open architecture. **We encourage you to use your fa
 
 ---
 
-## 🔌 Programmatic Python & MCP Server API
+## 🔌 Model Context Protocol (MCP) Server
 
-Both agent tools export cleanly modular functions for inclusion in custom applications or Model Context Protocol (MCP) servers:
+`agy-agents` includes a native **Model Context Protocol (MCP)** server (`agy-mcp` via FastMCP) enabling AI assistants across other IDEs and workspaces (OpenCode, Claude Desktop, Cursor, and subagent workpools) to invoke the Deep Research Council and autonomous code refactoring.
+
+### ⚡ Hybrid Architecture (No 60-Second Timeout Drops)
+Standard MCP clients enforce a strict 60-second RPC timeout. Because the 5-persona research council conducts 50 live Google searches and sandbox document compilation (taking ~3–8 minutes), `agy-mcp` implements a **hybrid execution protocol**:
+- **`prepare_research_prompt`**: (<1s) Dynamically crafts and saves a Citi-grade 5-persona research prompt file in `deep-research/prompts/<stem>.md` and provides the exact background CLI command.
+- **`start_research`**: (<1s) Spawns an asynchronous background worker and immediately returns a unique `job_id`, preventing client RPC timeout errors.
+- **`get_research_status`**: Queries job progress, returns execution elapsed time, and delivers the synthesized executive summary and paths to compiled artifacts (`.md`, `.html`, `.pdf`, `.docx`) upon completion.
+- **`refactor_code`**: (5–15s) Synchronous, high-speed code refactoring with AST syntax validation and unified diff preview.
+- **`list_research_prompts`**: Discovers available structured prompt templates and active stems.
+- **`check_gateway_health`**: Probes the inference gateway (`literouter.lan:7766` or Google Gemini) for reachability and latency.
+
+### 🛠️ Sovereign MCP Tools Overview
+
+| Tool Name | Type | Key Inputs | Description |
+| :--- | :--- | :--- | :--- |
+| `prepare_research_prompt` | Fast | `topic`, `prompt_stem`, `custom_rubric` | Sculpt tailored 5-persona research council prompt with background CLI execution commands. |
+| `start_research` | Async | `prompt_stem_or_topic`, `timeout_seconds` | Non-blocking dispatch returning `job_id` immediately. Avoids client timeout drops. |
+| `get_research_status` | Polling | `job_id` | Poll background progress or retrieve executive summary and compiled artifact paths. |
+| `refactor_code` | Sync | `code`, `filename`, `instructions` | Autonomously refactor Python code (PEP 8, strict type hints, clean architecture) with diff summary. |
+| `list_research_prompts` | Discovery | *(None)* | Scan repository for ready-to-run prompt templates and topics. |
+| `check_gateway_health` | Diagnostic | *(None)* | Inspect LiteRouter / Gemini endpoint connectivity and latency. |
+
+### 💻 Client Configurations
+
+The MCP service can be accessed via **Direct Intranet SSE (Recommended for LAN / WireGuard)** or **SSH Stdio (Zero configuration)**:
+
+#### Mode 1: Direct Network SSE (Intranet / WireGuard)
+
+Any client on the LAN or WireGuard mesh can connect directly to the persistent systemd service:
+- **SSE Stream URL**: `http://agy-agents.lan:7788/sse` *(or `http://192.168.50.10:7788/sse`)*
+- **Streamable HTTP URL**: `http://agy-agents.lan:7788/mcp`
+
+```json
+{
+  "mcpServers": {
+    "agy-agents": {
+      "url": "http://agy-agents.lan:7788/sse"
+    }
+  }
+}
+```
+
+#### Mode 2: SSH Stdio (Zero-Daemon CLI Subprocess)
+
+##### 1. OpenCode (`opencode.json`)
+```json
+{
+  "mcp": {
+    "agy-agents": {
+      "type": "local",
+      "command": [
+        "ssh",
+        "-o", "BatchMode=yes",
+        "vps466a",
+        "/home/vps466a/.local/bin/uv run --directory /home/vps466a/services/agy-agents agy-mcp"
+      ]
+    }
+  }
+}
+```
+
+##### 2. Claude Desktop (`claude_desktop_config.json`)
+```json
+{
+  "mcpServers": {
+    "agy-agents": {
+      "command": "ssh",
+      "args": [
+        "-o", "BatchMode=yes",
+        "vps466a",
+        "/home/vps466a/.local/bin/uv run --directory /home/vps466a/services/agy-agents agy-mcp"
+      ]
+    }
+  }
+}
+```
+
+##### 3. Cursor (`.cursor/mcp.json`)
+```json
+{
+  "mcpServers": {
+    "agy-agents": {
+      "command": "ssh",
+      "args": [
+        "-o", "BatchMode=yes",
+        "vps466a",
+        "/home/vps466a/.local/bin/uv run --directory /home/vps466a/services/agy-agents agy-mcp"
+      ]
+    }
+  }
+}
+```
+
+---
+
+## 🔌 Programmatic Python API
+
+Both agent tools export cleanly modular functions for inclusion in custom Python scripts:
 
 ```python
 from deep_research import execute_research
@@ -158,19 +289,25 @@ research_result = execute_research(
     prompt_content="Analyze impact of liquid cooling in next-gen AI data centers...",
     prompt_stem="data_center_cooling",
 )
-print("Generated report artifacts:", research_result["extracted_files"])
+print("Generated report artifacts:", research_result.extracted_files)
 
 # 2. Trigger Code Refactoring programmatically
 refactor_result = execute_refactor(
     code_content="def calculate(data): return [x*2 for x in data if x > 0]",
     prompt="Add complete type hints, Google docstrings, and input validation.",
 )
-print("Refactored code:\n", refactor_result["refactored_code"])
+print("Refactored code:\n", refactor_result.refactored_code)
 ```
 
 ---
 
 ## 🏷️ Releases & Versioning
+
+### `v1.2.0` — FastMCP Sovereign Server & Hybrid Architecture *(2026-10-07)*
+- 🔌 **FastMCP Integration**: Native MCP server (`agy-mcp`) exposing 6 sovereign tools for AI assistants in OpenCode, Claude Desktop, and Cursor.
+- ⚡ **Hybrid Execution Engine**: Solves 60s MCP RPC timeout drops via asynchronous background research jobs (`start_research`, `get_research_status`) and dynamic prompt preparation (`prepare_research_prompt`).
+- 🛠️ **Synchronous Code Refactoring**: Direct in-turn code modernization (`refactor_code`) with AST syntax validation and unified diff calculation.
+- 🌐 **VPS & LiteRouter LAN Deployment**: Validated remote execution over SSH against LiteRouter at `literouter.lan:7766` with zero hardcoded credentials.
 
 ### `v1.1.0` — Pydantic V2 Core Modernization *(2026-10-07)*
 - 🛡️ **Pydantic V2 Type Contracts**: Full migration to modern Pydantic V2 (`pydantic>=2.10.0`) across all workflows.

@@ -1,0 +1,23 @@
+---
+description: Development rules, schema contracts, and Antigravity endpoint constraints for agy-agents
+globs: *
+alwaysApply: true
+---
+
+# Cursor Rules for `agy-agents`
+
+## Architecture & Endpoints
+- **Antigravity Endpoint:** All agent workflows connect to `POST /v1beta/interactions` with `{"agent": "antigravity-preview-09-2026", "input": "...", "environment": "remote"}`.
+- **Forbidden:** Never use `/v1/chat/completions` (OpenAI format) or `:generateContent`.
+- **Inference Engines:** Dual-engine auto-resolution between LiteRouter (`http://literouter.lan:7766` or `127.0.0.1:7766`) and Google Gemini API. Override via `PROVIDER=literouter` or `PROVIDER=gemini`.
+
+## Coding & Schema Standards
+- **Pydantic V2 Only:** Use `pydantic>=2.10.0` with `model_config = ConfigDict(extra="forbid", validate_assignment=True)`.
+- **Python 3.10+ Compatibility:** Use `X | None` union syntax, `list[str]`, `dict[str, Any]`. Avoid Python 3.12 PEP 695 `type X = ...` declarations.
+- **FastMCP Tools:** Wrap RPC parameters cleanly and use `_unwrap_field()` so tools work seamlessly when called directly as Python functions.
+
+## Quality Gates
+- Run unit and integration tests before finishing tasks:
+  ```bash
+  uv run python -m unittest tests/test_mcp_server.py
+  ```

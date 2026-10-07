@@ -1,0 +1,27 @@
+# agy-agents
+
+> agy-agents is an open-source autonomous agent framework for institutional-grade deep research and automated code modernization running against the Google Antigravity sandbox (`antigravity-preview-09-2026`) via the stateful `/v1beta/interactions` endpoint.
+
+## Core Documentation
+- [Repository Overview](README.md): Quickstart, installation, usage, and environment configuration.
+- [Agent & LLM Orientation Guide](AGENTS.md): Master orientation and single source of truth for coding assistants.
+- [Claude Code Assistant Guide](CLAUDE.md): Direct development commands and architectural invariants for Claude CLI.
+- [System Architecture](ARCHITECTURE.md): Mermaid sequence diagrams, sandbox contracts, and verification primitives.
+
+## MCP Protocol & Tool Interfaces
+- [FastMCP Server Implementation](mcp_server.py): 6 sovereign tools with a hybrid async architecture for non-blocking execution.
+- [MCP Test Suite](tests/test_mcp_server.py): Deterministic unit and schema validation tests.
+
+## Deep Research Council
+- [Deep Research Engine](deep_research.py): Root modular export for executing 5-persona research panels.
+- [Research Runner](deep-research/deep-research.py): Core runner script with automatic artifact download and decompression.
+- [Research Prompt Template Guide](deep-research/prompts/_template_guide.md): Standard template for defining domain-tailored research personas.
+
+## Autonomous Code Refactoring
+- [Refactor Engine](refactor/refactor.py): Single-file CLI and batch manifest runner enforcing PEP 8 and clean architecture.
+- [Refactor Instructions](refactor/INSTRUCTIONS.md): Detailed multi-agent refactoring guide.
+
+## Configuration & Tool Rules
+- [GitHub Copilot Custom Instructions](.github/copilot-instructions.md): Context for GitHub Copilot Chat and PR reviews.
+- [Cursor IDE Rules](.cursor/rules/agy-agents.mdc): Scoped development rules for Cursor IDE.
+- [Project Configuration](pyproject.toml): Build dependencies, CLI entrypoints, and package metadata.

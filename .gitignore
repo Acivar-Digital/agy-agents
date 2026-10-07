@@ -43,3 +43,7 @@ Thumbs.db
 # Node / LiteRouter artifacts
 node_modules/
 dist/
+
+# Agent & Runtime state
+.jobs/
+.omp/

@@ -216,7 +216,10 @@ def get_provider_config(provider_override: ProviderChoice = "auto") -> ProviderC
 
     choice = provider_override.lower()
     if choice == "auto":
-        if gemini_key:
+        env_provider = os.getenv("PROVIDER", "").strip().lower()
+        if env_provider in ("gemini", "literouter"):
+            choice = env_provider
+        elif gemini_key:
             choice = "gemini"
         elif lr_key:
             choice = "literouter"

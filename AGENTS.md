@@ -1,71 +1,181 @@
-# agy-agents — Agent Instructions
+# agy-agents — LLM Orientation & Agent Instructions
 
-This repository contains standalone agentic workflows that run against the Google Antigravity sandbox (`antigravity-preview-09-2026`) via the `/v1beta/interactions` endpoint.
+`agy-agents` is an autonomous AI agent framework designed for institutional-grade intelligence gathering and production-ready code modernization. It operates against the Google Antigravity Sandbox (`antigravity-preview-09-2026`) via the stateful `/v1beta/interactions` API.
 
-It supports dual-engine inference:
-1. **Direct Google Gemini API (Default for Community)**: `https://generativelanguage.googleapis.com/v1beta/interactions` using `GEMINI_API_KEY`.
-2. **Self-Hosted Gateway (LiteRouter)**: `http://{LITEROUTER_HOST}:{LITEROUTER_PORT}/v1beta/interactions` using `LITEROUTER_AUTH_KEY`.
+---
 
-> **⚠️ DO NOT use `/v1/chat/completions` (OpenAI format).** Antigravity uses the `/v1beta/interactions` endpoint with a specialized payload and response schema.
+## 🧭 Repository At-A-Glance
 
-## Endpoint contract
+| Component | Primary Entrypoint | Description |
+| :--- | :--- | :--- |
+| **FastMCP Server** | `mcp_server.py` (`agy-mcp`) | 6 sovereign tools with a hybrid async architecture (solves 60s client timeouts). |
+| **Deep Research Council** | `deep_research.py` / `deep-research/` | 5-persona research panel, 50 web searches, multi-format export (.md, .html, .pdf, .docx). |
+| **Code Refactoring** | `refactor/` (`agy-refactor`) | Autonomous PEP 8, strict type hints, and clean architecture (single-file or batch manifests). |
+| **Pydantic V2 Contracts** | Core schemas across all modules | Strict data contracts (`pydantic>=2.10.0`) for requests, responses, manifests, and jobs. |
 
-- **Payload:** `{"agent": "antigravity-preview-09-2026", "input": "...", "environment": "remote"}` (supports optional `previous_interaction_id` for stateful multi-turn continuation).
-- **Response:** An interaction object with `object: "interaction"`, `status: "completed"`, an optional `environment_id` for downloading generated sandbox artifacts (.tar), and a `steps` array containing `thought` and `model_output` entries.
+---
 
-## Available Agents
+## ⚡ Inference Architecture & Dual-Engine Routing
 
-### 1. Deep Research (Council Protocol)
+Inference targets the stateful Google Antigravity endpoint (`POST /v1beta/interactions`):
+> **⚠️ NEVER use `/v1/chat/completions` (OpenAI format).** Antigravity uses `/v1beta/interactions` with `{"agent": "antigravity-preview-09-2026", "input": "...", "environment": "remote"}` and returns `steps` + sandbox `environment_id`.
 
-A multi-persona research council workflow that leverages Antigravity's live web-search and sandbox execution capabilities to produce heavily cited whitepapers compiled natively into Markdown, HTML, PDF, and DOCX.
+Resolution order in `get_provider_config("auto")`:
+1. `PROVIDER=literouter` (in `.env`) or `LITEROUTER_AUTH_KEY` → routes to **LiteRouter gateway** (`http://literouter.lan:7766` or `http://127.0.0.1:7766`).
+2. `PROVIDER=gemini` or `GEMINI_API_KEY` → routes directly to **Google Gemini API** (`https://generativelanguage.googleapis.com/v1beta/interactions`).
 
-**Input:** A prompt file in `deep-research/prompts/` defining the topic and 5 specialized research personas.
-**Output:** Structured reports saved in `deep-research/reports/`.
-**Python Export:** `from deep_research import execute_research`
+---
 
-**Workflow:**
-1. Configure credentials in `.env` (`GEMINI_API_KEY` or `LITEROUTER_AUTH_KEY`).
-2. Create or edit a prompt file in `deep-research/prompts/` using `_template_guide.md` as the template.
-   *(Tip: Ask your LLM to generate domain-tailored personas!)*
-3. Run: `uv run python deep-research/deep-research.py PromptName`
-4. Inspect the generated reports in `deep-research/reports/`.
+## 🔌 Model Context Protocol (FastMCP Server)
 
-### 2. Refactor (Autonomous Auto-Refactoring Pipeline)
+The MCP server is implemented in `mcp_server.py` and exposed via the `agy-mcp` CLI command.
 
-An autonomous agent pipeline that reads Python files, enforces PEP 8, strict type hints, and clean architecture, and writes the refactored code to disk.
+### Hybrid Async Architecture
+Standard MCP clients (Claude Desktop, Cursor, OpenCode) enforce a **hard 60-second RPC timeout**. Deep research takes 3–8 minutes. The MCP server solves this via non-blocking job coordination:
 
-**Input:** A single Python file (`path/to/script.py`) OR batch manifests (`refactor/manifests/*.json`).
-**Output:** Refactored `_refactored.py` files (or in-place), plus batch reports in `refactor/reports/`.
-**Python Export:** `from refactor import execute_refactor`
+1. **`prepare_research_prompt`** (Fast Sync, `<1s`):
+   - Generates a tailored 5-persona research prompt file in `deep-research/prompts/<stem>.md`.
+   - Returns file path, preview, and the exact background CLI command.
+2. **`start_research`** (Async Background, `<1s`):
+   - Spawns background worker executing the research council.
+   - Immediately returns a unique `job_id` (`job_xxxxxxxx`), preventing timeout drops.
+3. **`get_research_status`** (Polling, `<50ms`):
+   - Reads `.jobs/<job_id>.json`.
+   - While running: returns `status: "running"` and elapsed seconds.
+   - When finished: returns `status: "completed"`, executive summary, and paths to `.md`, `.html`, `.pdf`, `.docx`.
+4. **`refactor_code`** (Fast Sync, `5–15s`):
+   - Autonomously refactors Python code, validates AST syntax, and outputs clean code + unified diff.
+5. **`list_research_prompts`** (Discovery, `<50ms`):
+   - Scans `deep-research/prompts/*.md` and returns available templates and ready-to-run topics.
+6. **`check_gateway_health`** (Diagnostic, `<50ms`):
+   - Probes `literouter.lan:7766` or Gemini base URL for latency and reachability.
 
-**Workflow:**
-1. Configure credentials in `.env`.
-2. (Optional) Edit `refactor/prompt.txt` to customize refactoring rules for your team.
-3. Run single file: `uv run python refactor/refactor.py path/to/script.py`
-4. Run batch manifests: `uv run python refactor/refactor.py`
-5. Review the diff with `git diff`.
+### Client Configuration (OpenCode, Claude Desktop, Cursor)
 
-**Agent Workflow Rules for Refactoring:**
-- Always read the file first — do not send a file you haven't read.
-- Output only raw code — remove Markdown fences and conversational text.
-- Verify the output is valid Python — check for syntax errors before writing.
-- Never delete required logic — only restructure, rename, and add type hints.
-- Show the diff — run `git diff` after writing and present it to the user.
-- Run tests if available — if `pytest` or `unittest` is present, run the relevant tests and fix any failures before finalizing.
+**Intranet SSE / HTTP (`http://agy-agents.lan:7788/sse` or `/mcp`):**
+```json
+{
+  "mcpServers": {
+    "agy-agents": {
+      "url": "http://agy-agents.lan:7788/sse"
+    }
+  }
+}
+```
 
-## Key Files
+**SSH Stdio Transport (`opencode.json`):**
+```json
+{
+  "mcp": {
+    "agy-agents": {
+      "type": "local",
+      "command": [
+        "ssh",
+        "-o", "BatchMode=yes",
+        "vps466a",
+        "/home/vps466a/.local/bin/uv run --directory /home/vps466a/services/agy-agents agy-mcp"
+      ]
+    }
+  }
+}
+```
 
-- `deep-research/deep-research.py` — Deep research execution script (dual-engine + modular export)
-- `deep-research/run.sh` — Batch runner for research prompts
-- `deep-research/prompts/_template_guide.md` — Template for creating research prompts
-- `refactor/prompt.txt` — System prompt (editable instructions for the agent)
-- `refactor/refactor.py` — Dual-engine hybrid refactor script (CLI file arg + manifests + modular export)
-- `refactor/INSTRUCTIONS.md` — Detailed multi-agent refactoring guide
-- `.env.example` — Unified environment variables template
+---
 
-## Agent Workflow Rules
+## 🔬 Deep Research Council Workflow
 
-- When the user asks to "research a topic" or "conduct deep research," use the Deep Research agent.
-- When the user asks to "refactor code" or "improve code quality," use the Refactor agent.
-- Do not run research or refactoring scripts in the background without checking output.
-- Always encourage tailoring personas and prompts to match specific domain needs.
+A 5-persona research panel that executes 50 live Google searches and synthesizes institutional-grade whitepapers.
+
+- **Prompt Location:** `deep-research/prompts/<PromptName>.md` (Template: `_template_guide.md`).
+- **Generated Reports:** `deep-research/reports/<PromptName>_<timestamp>/` containing:
+  - `report.md`, `report.html`, `report.pdf`, `report.docx`
+  - Raw JSON execution log: `<PromptName>_<timestamp>_raw.json`
+- **CLI Commands:**
+  ```bash
+  # Foreground execution
+  uv run python deep-research/deep-research.py PromptName
+
+  # Background execution (recommended for long runs)
+  nohup uv run agy-research PromptName > PromptName.log 2>&1 &
+  ```
+- **Python Import:**
+  ```python
+  from deep_research import execute_research
+  result = execute_research(prompt_content="...", prompt_stem="my_topic")
+  print("Artifacts:", result.extracted_files)
+  ```
+
+---
+
+## 🛠️ Autonomous Code Refactoring Workflow
+
+Enforces clean architecture, PEP 8, and strict typing without conversational fluff.
+
+- **CLI Single File:**
+  ```bash
+  # Refactor to script_refactored.py
+  uv run agy-refactor path/to/script.py
+
+  # Refactor in place
+  uv run agy-refactor path/to/script.py --inplace
+  ```
+- **Batch Manifest Mode:**
+  Processes all manifests defined in `refactor/manifests/*.json`:
+  ```bash
+  uv run python refactor/refactor.py
+  ```
+- **Python Import:**
+  ```python
+  from refactor import execute_refactor
+  result = execute_refactor(code_content="def add(a, b): return a + b", prompt="Add type hints")
+  print(result.refactored_code)
+  ```
+
+---
+
+## 🖥️ VPS Deployment Topology (`vps466a`)
+
+- **Host & Path:** `vps466a:/home/vps466a/services/agy-agents`
+- **Intranet MCP Endpoint:** `http://agy-agents.lan:7788/sse` (SSE) / `http://agy-agents.lan:7788/mcp` (Streamable HTTP), bound to `0.0.0.0:7788` (`192.168.50.10:7788`).
+- **Active Gateway:** Local LiteRouter gateway at `http://literouter.lan:7766` (`127.0.0.1:7766`).
+- **Remote Environment:** Python managed via `/home/vps466a/.local/bin/uv`.
+- **Sync Command from Local:**
+  ```bash
+  rsync -avz --exclude='.git' --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='.jobs' ./ vps466a:services/agy-agents/
+  ```
+
+---
+
+## 📂 Key Files & Directories
+
+```
+agy-agents/
+├── AGENTS.md                       ← This master orientation document
+├── README.md                       ← Public developer & user documentation
+├── CHANGELOG.md                    ← Release history (v1.2.0 FastMCP)
+├── pyproject.toml                  ← Build targets, deps, CLI scripts (agy-research, agy-refactor, agy-mcp)
+├── mcp_server.py                   ← FastMCP server implementation (6 tools, async job manager)
+├── tests/
+│   └── test_mcp_server.py          ← Test suite for MCP contracts, tools, and execution
+├── deep_research.py                ← Root import shim for execute_research()
+├── deep-research/
+│   ├── deep-research.py            ← Deep research runner & sandbox extractor
+│   ├── prompts/                    ← Prompt library (*.md) and _template_guide.md
+│   └── reports/                    ← Generated whitepapers & artifact tarballs (gitignored)
+├── refactor/
+│   ├── __init__.py                 ← Package exports for execute_refactor()
+│   ├── refactor.py                 ← Dual-engine single-file & batch refactorer
+│   ├── prompt.txt                  ← System prompt for refactoring standards
+│   └── manifests/                  ← Batch refactoring manifests
+└── .jobs/                          ← Background job state registry (.jobs/<id>.json, gitignored)
+```
+
+---
+
+## 🎯 LLM Instructions When Operating in This Repo
+
+1. **Do Not Re-scan the Codebase:** This document provides the complete architecture and entrypoints.
+2. **For Deep Research:** Use `prepare_research_prompt` to generate prompt files, or run via `start_research` (MCP) / `nohup uv run agy-research <stem> &` (CLI).
+3. **For Code Refactoring:** Use `refactor_code` (MCP) or `uv run agy-refactor <file>` (CLI).
+4. **For Gateway Diagnostics:** Check LiteRouter health via `check_gateway_health` or probe `http://literouter.lan:7766/health`.
+5. **Git Rules:** Local-only by default; never run git push without explicit user instruction.
