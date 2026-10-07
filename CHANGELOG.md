@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-08
+
+### Added
+- **Dual-Transport MCP Network Endpoint**: Implemented dual-transport routing in `mcp_server.py` supporting Streamable HTTP (`POST /sse` and `POST /mcp`) for `omp` (`type: remote`) alongside Server-Sent Events (`GET /sse`) and HEAD health probes.
+- **In-Band Markdown Report Delivery**: Enhanced `get_research_status` to embed the complete Markdown report (`report.md`) directly in the tool response (`#### Full Markdown Report`), enabling client LLMs to ingest deep research reports instantly without filesystem dependencies.
+- **LAN HTTP Artifact Serving**: Added `GET /reports/{filename}` route to `agy-mcp` on port `:7788`, allowing LAN agents and browsers to directly fetch `.md`, `.html`, `.pdf`, and `.docx` artifacts via `http://agy-agents.lan:7788/reports/...`.
+- **Stem-Based Job Lookup Fallback**: `get_research_status` now accepts topic stems (e.g. `Direction_of_JPY`) to automatically resolve and deliver the most recent completed run for that topic.
+- **Interaction Step Extraction Fallback**: `deep-research.py` now extracts Markdown text directly from `InteractionStep` content blocks in raw interactions if the remote Antigravity sandbox does not produce a separate `report.md` artifact file.
+- **Comprehensive FastMCP Test Suite**: Added Starlette `TestClient` tests covering Streamable HTTP, SSE, HEAD probes, static `/reports/{filename}` serving, and in-band Markdown extraction in `tests/test_mcp_server.py`.
+- **Skill Documentation v1.3.0**: Completely updated `.opencode/skills/agy-agents/SKILL.md` covering the 6 sovereign MCP tools, dual-transport endpoints, artifact consumption channels, and `omp` / `OpenCode` configuration patterns.
+
 ## [1.2.0] - 2026-10-07
 
 ### Added

@@ -45,7 +45,9 @@ class TestMCPContracts(unittest.TestCase):
     """Verifies Pydantic V2 model schema enforcement and validation rules."""
 
     def test_prompt_preparation_input_valid(self):
-        inp = PromptPreparationInput(topic="Quantum Computing", prompt_stem="quantum_stem")
+        inp = PromptPreparationInput(
+            topic="Quantum Computing", prompt_stem="quantum_stem"
+        )
         self.assertEqual(inp.topic, "Quantum Computing")
         self.assertEqual(inp.prompt_stem, "quantum_stem")
         self.assertIsNone(inp.custom_rubric)
@@ -60,13 +62,17 @@ class TestMCPContracts(unittest.TestCase):
             PromptPreparationInput(topic="Valid Topic", unexpected_field="boom")
 
     def test_start_research_input_validation(self):
-        inp = StartResearchInput(prompt_stem_or_topic="Direction_of_JPY", timeout_seconds=300.0)
+        inp = StartResearchInput(
+            prompt_stem_or_topic="Direction_of_JPY", timeout_seconds=300.0
+        )
         self.assertEqual(inp.prompt_stem_or_topic, "Direction_of_JPY")
         self.assertEqual(inp.timeout_seconds, 300.0)
 
         # timeout must be > 0
         with self.assertRaises(ValidationError):
-            StartResearchInput(prompt_stem_or_topic="Direction_of_JPY", timeout_seconds=0.0)
+            StartResearchInput(
+                prompt_stem_or_topic="Direction_of_JPY", timeout_seconds=0.0
+            )
 
         # extra fields forbidden
         with self.assertRaises(ValidationError):
@@ -186,6 +192,7 @@ class TestMCPToolsExecution(unittest.TestCase):
 
         # Extract job_id
         import re
+
         match = re.search(r"job_[a-f0-9]{8}", res_start)
         self.assertIsNotNone(match)
         job_id = match.group(0)
@@ -193,7 +200,11 @@ class TestMCPToolsExecution(unittest.TestCase):
         # 2. Poll research status
         res_status = get_research_status(job_id=job_id)
         self.assertIn(job_id, res_status)
-        self.assertTrue("running" in res_status or "completed" in res_status or "failed" in res_status)
+        self.assertTrue(
+            "running" in res_status
+            or "completed" in res_status
+            or "failed" in res_status
+        )
 
         # 3. Test non-existent job ID
         res_invalid = get_research_status(job_id="job_nonexistent_999")
@@ -206,6 +217,51 @@ class TestMCPToolsExecution(unittest.TestCase):
         prompt_file = mcp_server.PROMPTS_DIR / f"{tmp_stem}.md"
         if prompt_file.exists():
             prompt_file.unlink()
+
+    def test_dual_network_app_streamable_http_and_sse(self):
+        from starlette.testclient import TestClient
+
+        app = mcp_server.create_network_app(mcp)
+        init_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test-client", "version": "1.0.0"},
+            },
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        with TestClient(app) as client:
+            # 1. Streamable HTTP POST to /sse (used by omp via opencode.json type: remote)
+            resp_sse_post = client.post("/sse", json=init_payload, headers=headers)
+            self.assertEqual(resp_sse_post.status_code, 200)
+            self.assertIn("agy-agents", resp_sse_post.text)
+
+            # 2. Streamable HTTP POST to /mcp
+            resp_mcp_post = client.post("/mcp", json=init_payload, headers=headers)
+            self.assertEqual(resp_mcp_post.status_code, 200)
+            self.assertIn("agy-agents", resp_mcp_post.text)
+
+            # 3. HEAD probe on /sse
+            resp_sse_head = client.head("/sse")
+            self.assertEqual(resp_sse_head.status_code, 200)
+
+            # 4. Static /reports/{filename} HTTP pickup & stem-based Markdown delivery
+            resp_md = client.get("/reports/Direction_of_JPY_20260729_0826.md")
+            self.assertEqual(resp_md.status_code, 200)
+            self.assertIn("INSTITUTIONAL DEEP RESEARCH REPORT", resp_md.text)
+
+        res_jpy = get_research_status(job_id="Direction_of_JPY")
+        self.assertIn("#### Full Markdown Report", res_jpy)
+        self.assertIn(
+            "http://agy-agents.lan:7788/reports/Direction_of_JPY_20260729_0826.md",
+            res_jpy,
+        )
 
 
 if __name__ == "__main__":

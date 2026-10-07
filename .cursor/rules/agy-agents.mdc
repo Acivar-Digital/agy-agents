@@ -1,6 +1,6 @@
 ---
 description: Development rules, schema contracts, and Antigravity endpoint constraints for agy-agents
-globs: *
+globs: "*"
 alwaysApply: true
 ---
 

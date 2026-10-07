@@ -56,6 +56,7 @@ ActiveProvider: TypeAlias = Literal["gemini", "literouter"]
 
 class ProviderConfig(BaseModel):
     """Immutable, strictly validated configuration for an inference provider."""
+
     model_config = ConfigDict(extra="forbid", validate_assignment=True, frozen=True)
 
     provider_name: ActiveProvider
@@ -75,20 +76,32 @@ class ProviderConfig(BaseModel):
     @classmethod
     def validate_download_url(cls, v: str) -> str:
         if "{env_id}" not in v:
-            raise ValueError("download_url_template must contain '{env_id}' placeholder")
+            raise ValueError(
+                "download_url_template must contain '{env_id}' placeholder"
+            )
         return v
 
     def __iter__(self) -> Iterator[str | dict[str, str]]:
         """Support unpacking: provider_name, gateway_url, download_url_template, headers = config."""
-        return iter((self.provider_name, self.gateway_url, self.download_url_template, self.headers))
+        return iter(
+            (
+                self.provider_name,
+                self.gateway_url,
+                self.download_url_template,
+                self.headers,
+            )
+        )
 
 
 class InteractionRequest(BaseModel):
     """Validated payload model for the LiteRouter / Gemini interactions API."""
+
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     agent: str = Field(min_length=1, description="Agent model identifier")
-    input: str = Field(min_length=1, description="Prompt and instructions for the agent")
+    input: str = Field(
+        min_length=1, description="Prompt and instructions for the agent"
+    )
     environment: Literal["remote", "local"] = "remote"
     previous_interaction_id: str | None = None
 
@@ -103,6 +116,7 @@ class InteractionRequest(BaseModel):
 
 class InteractionStep(BaseModel):
     """Represents a thought or execution step in an interaction."""
+
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
     thought: str | None = None
@@ -113,6 +127,7 @@ class InteractionStep(BaseModel):
 
 class InteractionResponse(BaseModel):
     """Response envelope from the LiteRouter / Gemini interaction endpoint."""
+
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
     id: str | None = None
@@ -133,6 +148,16 @@ class InteractionResponse(BaseModel):
         for step in reversed(self.steps):
             if step.model_output and step.model_output.strip():
                 return step.model_output.strip()
+            step_dict = step.model_dump()
+            content = step_dict.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    if (
+                        isinstance(part, dict)
+                        and isinstance(part.get("text"), str)
+                        and part["text"].strip()
+                    ):
+                        return part["text"].strip()
             if step.thought and step.thought.strip():
                 return step.thought.strip()
         return None
@@ -140,6 +165,7 @@ class InteractionResponse(BaseModel):
 
 class ResearchExecutionRequest(BaseModel):
     """Validated input parameters for executing research."""
+
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     prompt_content: str = Field(min_length=1)
@@ -161,6 +187,7 @@ class ResearchExecutionRequest(BaseModel):
 
 class ResearchExecutionResult(BaseModel):
     """Result data contract for completed deep research operations."""
+
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     status: Literal["completed", "failed"] = "completed"
@@ -191,7 +218,9 @@ def get_provider_config(provider_override: ProviderChoice = "auto") -> ProviderC
     lr_key = os.getenv("LITEROUTER_AUTH_KEY", "").strip()
     lr_host = os.getenv("LITEROUTER_HOST", "literouter.lan").strip()
     lr_port = os.getenv("LITEROUTER_PORT", "7766").strip()
-    google_base = os.getenv("GOOGLE_NATIVE_BASE_URL", "https://generativelanguage.googleapis.com").strip()
+    google_base = os.getenv(
+        "GOOGLE_NATIVE_BASE_URL", "https://generativelanguage.googleapis.com"
+    ).strip()
 
     choice = provider_override.lower()
     if choice == "auto":
@@ -212,7 +241,9 @@ def get_provider_config(provider_override: ProviderChoice = "auto") -> ProviderC
                 "Please set GEMINI_API_KEY in your .env file or environment."
             )
         gateway_url = f"{google_base}/v1beta/interactions"
-        download_url = f"{google_base}/v1beta/files/environment-{{env_id}}:download?alt=media"
+        download_url = (
+            f"{google_base}/v1beta/files/environment-{{env_id}}:download?alt=media"
+        )
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": gemini_key,
@@ -361,7 +392,9 @@ def execute_research(
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     base_output_path = target_reports_dir / f"{exec_req.prompt_stem}_{timestamp}"
-    output_json_path = target_reports_dir / f"{exec_req.prompt_stem}_{timestamp}_raw.json"
+    output_json_path = (
+        target_reports_dir / f"{exec_req.prompt_stem}_{timestamp}_raw.json"
+    )
 
     final_prompt = exec_req.prompt_content.strip() + AGENT_FILE_INSTRUCTION
 
@@ -394,12 +427,23 @@ def execute_research(
 
     extracted_files: list[Path] = []
     if env_id:
-        extracted_files = download_and_extract_sandbox(
-            env_id=env_id,
-            base_output_path=base_output_path,
-            download_url_template=provider_config.download_url_template,
-            headers=provider_config.headers,
-        )
+        try:
+            extracted_files = download_and_extract_sandbox(
+                env_id=env_id,
+                base_output_path=base_output_path,
+                download_url_template=provider_config.download_url_template,
+                headers=provider_config.headers,
+            )
+        except Exception as e:
+            print(f"⚠️ Sandbox download warning: {e}", file=sys.stderr)
+
+    has_md = any(p.suffix == ".md" for p in extracted_files)
+    if not has_md:
+        fallback_text = parsed_resp.extract_text()
+        if fallback_text:
+            md_path = base_output_path.with_suffix(".md")
+            md_path.write_text(fallback_text, encoding="utf-8")
+            extracted_files.insert(0, md_path)
 
     return ResearchExecutionResult(
         status="completed",
@@ -417,7 +461,9 @@ def run_deep_research():
     parser = argparse.ArgumentParser(
         description="Deep Research Agent Tool (Dual-Engine: Google Gemini & LiteRouter)",
     )
-    parser.add_argument("target", help="The name of the prompt template (e.g. Direction_of_JPY)")
+    parser.add_argument(
+        "target", help="The name of the prompt template (e.g. Direction_of_JPY)"
+    )
     parser.add_argument(
         "--provider",
         choices=["auto", "gemini", "literouter"],
@@ -453,7 +499,9 @@ def run_deep_research():
     print(f"📄 Reading Prompt: {prompt_file}")
     print(f"📁 Output Dir:     {REPORTS_DIR}")
     if args.previous_interaction_id:
-        print(f"🔗 Stateful Turn:  Continuing interaction {args.previous_interaction_id}")
+        print(
+            f"🔗 Stateful Turn:  Continuing interaction {args.previous_interaction_id}"
+        )
     print("==================================================================\n")
 
     prompt_content = prompt_file.read_text(encoding="utf-8").strip()

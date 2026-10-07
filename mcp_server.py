@@ -49,11 +49,13 @@ load_dotenv(DEEP_RESEARCH_DIR / ".env")
 load_dotenv(REPO_ROOT / "refactor" / ".env")
 load_dotenv()
 
+
 def _unwrap_field(val: Any, default_fallback: Any = None) -> Any:
     """Unwraps default FieldInfo if tool is called directly as a Python function."""
     if isinstance(val, FieldInfo):
         return default_fallback if val.default is ... else val.default
     return val
+
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -359,23 +361,51 @@ def _load_job_state(job_id: str) -> dict[str, Any] | None:
         return None
 
 
-def _extract_summary_from_report(report_path: Path | None, raw_response: dict[str, Any] | None) -> str:
+def _extract_markdown_from_raw(raw_response: dict[str, Any] | None) -> str | None:
+    """Extracts full markdown output from Antigravity interaction steps."""
+    if not raw_response or "steps" not in raw_response:
+        return None
+    steps = raw_response.get("steps", [])
+    for step in reversed(steps):
+        if not isinstance(step, dict):
+            continue
+        output = step.get("model_output", "")
+        if isinstance(output, str) and output.strip():
+            return output.strip()
+        content = step.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if (
+                    isinstance(part, dict)
+                    and isinstance(part.get("text"), str)
+                    and part["text"].strip()
+                ):
+                    return part["text"].strip()
+    return None
+
+
+def _extract_summary_from_report(
+    report_path: Path | None, raw_response: dict[str, Any] | None
+) -> str:
     """Extracts a high-signal markdown summary from generated report or response steps."""
     if report_path and report_path.exists():
         text = report_path.read_text(encoding="utf-8")
         # Look for executive thesis callout box or first 1200 characters
-        match = re.search(r"(> 📌 \*\*CITI INVESTMENT THESIS.*?\n(?=[^>]))", text, re.DOTALL)
+        match = re.search(
+            r"(> 📌 \*\*CITI INVESTMENT THESIS.*?\n(?=[^>]))", text, re.DOTALL
+        )
         if match:
             return match.group(1).strip()
-        lines = [line for line in text.splitlines() if line.strip() and not line.startswith("#")]
+        lines = [
+            line
+            for line in text.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
         return "\n".join(lines[:12])
 
-    if raw_response and "steps" in raw_response:
-        steps = raw_response.get("steps", [])
-        for step in reversed(steps):
-            output = step.get("model_output", "")
-            if output:
-                return output[:1000].strip()
+    raw_md = _extract_markdown_from_raw(raw_response)
+    if raw_md:
+        return raw_md[:1000].strip()
 
     return "Research completed successfully. See artifact links for complete report."
 
@@ -397,7 +427,9 @@ def _run_research_worker(
 
         elapsed = round(time.time() - start_time, 2)
         extracted = [str(f) for f in result.extracted_files]
-        report_md = next((Path(f) for f in result.extracted_files if f.endswith(".md")), None)
+        report_md = next(
+            (Path(f) for f in result.extracted_files if f.endswith(".md")), None
+        )
         summary = _extract_summary_from_report(report_md, result.response)
 
         job_data = {
@@ -405,7 +437,9 @@ def _run_research_worker(
             "status": "completed",
             "prompt_stem": prompt_stem,
             "elapsed_seconds": elapsed,
-            "report_path": str(report_md) if report_md else (extracted[0] if extracted else None),
+            "report_path": str(report_md)
+            if report_md
+            else (extracted[0] if extracted else None),
             "artifacts": extracted,
             "summary": summary,
             "raw_json_path": result.raw_json_path,
@@ -553,7 +587,9 @@ def start_research(
         prompt_content = potential_file.read_text(encoding="utf-8")
     else:
         effective_stem = _clean_stem(req.prompt_stem)
-        prompt_content = _sculpt_5_persona_prompt(req.prompt_stem_or_topic, req.custom_rubric)
+        prompt_content = _sculpt_5_persona_prompt(
+            req.prompt_stem_or_topic, req.custom_rubric
+        )
         target_file = PROMPTS_DIR / f"{effective_stem}.md"
         target_file.write_text(prompt_content, encoding="utf-8")
 
@@ -595,24 +631,52 @@ def start_research(
     )
 
 
+def _find_latest_report_by_stem(stem_or_id: str) -> dict[str, Any] | None:
+    """Finds the latest completed report matching a prompt stem in REPORTS_DIR."""
+    clean = _clean_stem(stem_or_id)
+    md_matches = sorted(REPORTS_DIR.glob(f"{clean}_*.md"))
+    if not md_matches:
+        return None
+    latest_md = md_matches[-1]
+    prefix = latest_md.stem  # e.g. Direction_of_JPY_20260729_0826
+    artifacts = [
+        str(p)
+        for p in sorted(REPORTS_DIR.glob(f"{prefix}*"))
+        if not p.name.endswith("_raw.json")
+    ]
+    raw_json = REPORTS_DIR / f"{prefix}_raw.json"
+    summary = _extract_summary_from_report(latest_md, None)
+    return {
+        "job_id": stem_or_id,
+        "status": "completed",
+        "prompt_stem": clean,
+        "elapsed_seconds": 0.0,
+        "report_path": str(latest_md),
+        "artifacts": artifacts,
+        "summary": summary,
+        "raw_json_path": str(raw_json) if raw_json.exists() else None,
+        "error": None,
+    }
+
+
 @mcp.tool(
     name="get_research_status",
     description=(
-        "Check progress of a running research job or retrieve executive summary and "
-        "downloaded artifacts (.md, .html, .pdf, .docx) once completed."
+        "Check progress of a running research job or retrieve executive summary, "
+        "full Markdown report, and downloaded artifacts (.md, .html, .pdf, .docx) once completed."
     ),
 )
 def get_research_status(
     job_id: str = Field(
         ...,
         min_length=1,
-        description="Unique job ID returned by start_research",
+        description="Unique job ID returned by start_research (or a prompt stem like 'Direction_of_JPY' to fetch its latest completed report)",
     ),
 ) -> str:
     """Queries current progress or completed results of a background research job."""
     job_id = _unwrap_field(job_id, "")
     req = ResearchStatusInput(job_id=job_id)
-    job_data = _load_job_state(req.job_id)
+    job_data = _load_job_state(req.job_id) or _find_latest_report_by_stem(req.job_id)
 
     if not job_data:
         return f"Error: Job ID `{req.job_id}` was not found in `.jobs/` registry."
@@ -646,8 +710,31 @@ def get_research_status(
     report_path = job_data.get("report_path", "N/A")
     artifacts = job_data.get("artifacts", [])
     summary = job_data.get("summary", "No executive summary available.")
+    public_base = os.getenv("MCP_PUBLIC_URL", "http://agy-agents.lan:7788").rstrip("/")
 
-    artifacts_md = "\n".join(f"  - `{a}`" for a in artifacts) if artifacts else "  - None"
+    artifact_lines: list[str] = []
+    for a in artifacts:
+        fname = Path(a).name
+        artifact_lines.append(f"  - `{a}` (`{public_base}/reports/{fname}`)")
+    artifacts_md = "\n".join(artifact_lines) if artifact_lines else "  - None"
+
+    full_markdown = ""
+    if report_path and report_path != "N/A":
+        rp = Path(report_path)
+        if rp.exists() and rp.suffix == ".md":
+            full_markdown = rp.read_text(encoding="utf-8")
+    if not full_markdown:
+        raw_json_path = job_data.get("raw_json_path")
+        if raw_json_path and Path(raw_json_path).exists():
+            try:
+                raw_obj = json.loads(Path(raw_json_path).read_text(encoding="utf-8"))
+                full_markdown = _extract_markdown_from_raw(raw_obj) or ""
+            except Exception:
+                full_markdown = ""
+
+    report_section = (
+        f"\n\n#### Full Markdown Report\n\n{full_markdown}" if full_markdown else ""
+    )
 
     return (
         f"### Research Completed: `{req.job_id}`\n\n"
@@ -657,6 +744,7 @@ def get_research_status(
         f"- **Report Markdown:** `{report_path}`\n\n"
         f"#### Artifacts Generated\n{artifacts_md}\n\n"
         f"#### Executive Summary\n{summary}"
+        f"{report_section}"
     )
 
 
@@ -772,13 +860,25 @@ def list_research_prompts() -> str:
         # Read first 25 lines to extract objective
         try:
             content = p.read_text(encoding="utf-8")[:1500]
-            obj_match = re.search(r'##\s*1?\s*\.?\s*OBJECTIVE[^\n]*\n[^\n]*\n"([^"]+)"', content, re.IGNORECASE)
+            obj_match = re.search(
+                r'##\s*1?\s*\.?\s*OBJECTIVE[^\n]*\n[^\n]*\n"([^"]+)"',
+                content,
+                re.IGNORECASE,
+            )
             if not obj_match:
-                obj_match = re.search(r'##\s*1?\s*\.?\s*OBJECTIVE[^\n]*\n.*?on:\s*\n"([^"]+)"', content, re.DOTALL | re.IGNORECASE)
+                obj_match = re.search(
+                    r'##\s*1?\s*\.?\s*OBJECTIVE[^\n]*\n.*?on:\s*\n"([^"]+)"',
+                    content,
+                    re.DOTALL | re.IGNORECASE,
+                )
             if not obj_match:
-                obj_match = re.search(r'#\s*([^\n]+)', content)
-            
-            objective = obj_match.group(1).strip() if obj_match else "Standard research council protocol"
+                obj_match = re.search(r"#\s*([^\n]+)", content)
+
+            objective = (
+                obj_match.group(1).strip()
+                if obj_match
+                else "Standard research council protocol"
+            )
             # Truncate for table
             if len(objective) > 75:
                 objective = objective[:72] + "..."
@@ -787,7 +887,9 @@ def list_research_prompts() -> str:
 
         lines.append(f"| `{stem}` | {ptype} | {objective} |")
 
-    lines.append("\nTo start research, call `start_research(prompt_stem_or_topic='<stem>')`.")
+    lines.append(
+        "\nTo start research, call `start_research(prompt_stem_or_topic='<stem>')`."
+    )
     return "\n".join(lines)
 
 
@@ -841,12 +943,112 @@ def check_gateway_health() -> str:
 
 
 # ==============================================================================
-# Entrypoint Runner
+# Entrypoint Runner & Dual-Transport Network App
 # ==============================================================================
 
 
+class _HybridSseStreamableASGIApp:
+    """ASGI endpoint for /sse supporting both Legacy SSE (GET) and Streamable HTTP (POST/DELETE/session GET)."""
+
+    def __init__(
+        self,
+        server: FastMCP,
+        sse_transport: Any,
+        streamable_app: Any,
+    ) -> None:
+        self._server = server
+        self._sse = sse_transport
+        self._streamable_app = streamable_app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        method = str(scope.get("method", "GET")).upper()
+        headers = {bytes(k).lower() for k, _ in scope.get("headers", ())}
+        if method in ("POST", "DELETE") or b"mcp-session-id" in headers:
+            await self._streamable_app(scope, receive, send)
+            return
+        if method == "HEAD":
+            from starlette.responses import Response
+
+            resp = Response(status_code=200, media_type="text/event-stream")
+            await resp(scope, receive, send)
+            return
+        async with self._sse.connect_sse(scope, receive, send) as streams:
+            await self._server._mcp_server.run(
+                streams[0],
+                streams[1],
+                self._server._mcp_server.create_initialization_options(),
+            )
+
+
+def create_network_app(server: FastMCP | None = None) -> Any:
+    """Builds a Starlette ASGI app serving both Streamable HTTP (/mcp, /sse) and Legacy SSE (/sse, /messages/)."""
+    from fastmcp.server.http import create_streamable_http_app
+    from mcp.server.sse import SseServerTransport
+    from mcp.server.transport_security import TransportSecuritySettings
+    from starlette.routing import Mount, Route
+
+    target_server = server or mcp
+    app = create_streamable_http_app(
+        server=target_server,
+        streamable_http_path="/mcp",
+    )
+
+    streamable_endpoint: Any = None
+    for route in app.routes:
+        if isinstance(route, Route) and route.path == "/mcp":
+            streamable_endpoint = route.endpoint
+            break
+
+    sse_transport = SseServerTransport(
+        "/messages/",
+        security_settings=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False
+        ),
+    )
+    hybrid_sse_app = _HybridSseStreamableASGIApp(
+        server=target_server,
+        sse_transport=sse_transport,
+        streamable_app=streamable_endpoint,
+    )
+
+    app.routes.insert(
+        0,
+        Route(
+            "/sse",
+            endpoint=hybrid_sse_app,
+            methods=["GET", "HEAD", "POST", "DELETE"],
+        ),
+    )
+    app.routes.insert(
+        1,
+        Mount(
+            "/messages/",
+            app=sse_transport.handle_post_message,
+        ),
+    )
+
+    async def _serve_report_file(request: Any) -> Any:
+        from starlette.responses import FileResponse, PlainTextResponse
+
+        filename = Path(request.path_params.get("filename", "")).name
+        target = (REPORTS_DIR / filename).resolve()
+        if not target.is_relative_to(REPORTS_DIR.resolve()) or not target.is_file():
+            return PlainTextResponse("Report artifact not found", status_code=404)
+        return FileResponse(target)
+
+    app.routes.insert(
+        2,
+        Route(
+            "/reports/{filename}",
+            endpoint=_serve_report_file,
+            methods=["GET", "HEAD"],
+        ),
+    )
+    return app
+
+
 def main() -> None:
-    """Runs the FastMCP server supporting stdio, SSE, and HTTP transports."""
+    """Runs the FastMCP server supporting stdio and dual-transport SSE/Streamable-HTTP network endpoints."""
     parser = argparse.ArgumentParser(description="agy-agents FastMCP Server")
     parser.add_argument(
         "--transport",
@@ -870,7 +1072,10 @@ def main() -> None:
     if args.transport == "stdio":
         mcp.run(transport="stdio")
     else:
-        mcp.run(transport=args.transport, host=args.host, port=args.port)
+        import uvicorn
+
+        app = create_network_app(mcp)
+        uvicorn.run(app, host=args.host, port=args.port, timeout_graceful_shutdown=2)
 
 
 if __name__ == "__main__":

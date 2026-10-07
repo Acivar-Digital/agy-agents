@@ -1,6 +1,6 @@
 [project]
 name = "agy-agents"
-version = "1.2.0"
+version = "1.3.0"
 description = "Autonomous Deep Research Council and Code Refactoring Agents powered by Google Gemini & LiteRouter"
 readme = "README.md"
 requires-python = ">=3.10"
