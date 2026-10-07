@@ -1,24 +1,45 @@
-# Environment
+# Environment variables
 .env
+.env.*
+!.env.example
 
-# Generated reports
-deep-research/reports/
-refactor/reports/
+# Credentials & keys
+*.key
+*.token
+credentials.json
+secrets/
 
-# Python
+# Python artifacts
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+ENV/
+env/
 
-# OS
+# Generated reports & sandboxes
+deep-research/reports/
+refactor/reports/
+refactor/output/
+*.tar
+*_raw.json
+raw_response.json
+
+# OS artifacts
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE & editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Node (if LiteRouter is Node-based)
+# Node / LiteRouter artifacts
 node_modules/
 dist/

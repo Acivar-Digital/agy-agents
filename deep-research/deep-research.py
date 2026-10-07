@@ -1,82 +1,105 @@
 import argparse
 import json
 import os
+import shutil
 import sys
-import time
-import httpx
 import tarfile
 import tempfile
-import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+import httpx
 
 # ==============================================================================
-# 🔑 API KEY & ROUTING CONFIGURATION
-# Loaded dynamically via uv --env-file
+# 🔑 API ROUTING & CONFIGURATION
+# Loaded dynamically via .env
 # ==============================================================================
-# Resolve repository root and load .env BEFORE reading config so .env is authoritative.
 RESEARCH_DIR = Path(__file__).resolve().parent
 REPO_ROOT = RESEARCH_DIR.parent
 load_dotenv(dotenv_path=REPO_ROOT / ".env")
+load_dotenv(dotenv_path=RESEARCH_DIR / ".env")
 
-# Gateway requires a Google directive (lr-gg-*), NOT the sk-lr-* master key.
-LITEROUTER_KEY = os.getenv("LITEROUTER_AUTH_KEY", "REDACTED")
-LITEROUTER_PORT = os.getenv("LITEROUTER_PORT", "7766")
+PROMPTS_DIR = RESEARCH_DIR / "prompts"
+REPORTS_DIR = RESEARCH_DIR / "reports"
 
-# Google Gemini native API key for direct interactions endpoint.
-# When set, the agent POSTs to the Gemini API directly (more reliable than the
-# local LiteRouter gateway, which drops sandbox environments before downloads).
-# Leave blank to fall back to the local LiteRouter gateway.
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-GOOGLE_NATIVE_BASE_URL = os.getenv("GOOGLE_NATIVE_BASE_URL", "https://generativelanguage.googleapis.com")
-
-# Core interaction endpoint. Prefer the direct Gemini API when GEMINI_API_KEY is set;
-# otherwise use the local LiteRouter gateway (HTTPS only, HTTP/2 on 7766).
-if GEMINI_API_KEY:
-    GATEWAY_URL = f"{GOOGLE_NATIVE_BASE_URL}/v1beta/interactions"
-else:
-    GATEWAY_URL = f"https://localhost:{LITEROUTER_PORT}/v1beta/interactions"
-
-# The CORRECT File API endpoint for downloading the full environment snapshot (.tar).
-# When GEMINI_API_KEY is set, use the direct Gemini API (same host as GATEWAY_URL).
-if GEMINI_API_KEY:
-    FILE_DOWNLOAD_URL = f"{GOOGLE_NATIVE_BASE_URL}/v1beta/files/environment-{{env_id}}:download?alt=media"
-else:
-    FILE_DOWNLOAD_URL = f"https://localhost:{LITEROUTER_PORT}/v1beta/files/environment-{{env_id}}:download?alt=media"
-
-# Per-request auth headers for the direct Gemini API.
-GEMINI_HEADERS = {
-    "Content-Type": "application/json",
-    "x-goog-api-key": GEMINI_API_KEY,
-}
-
-# Shared HTTP/2 client for the local LiteRouter gateway. The gateway is HTTPS-only
-# with a self-signed localhost cert, so verification is disabled and HTTP/2 is used
-# when the `h2` package is available. If `h2` is missing we fall back to HTTP/1.1
-# rather than crashing, and warn loudly so the operator knows HTTP/2 is not active.
+# Shared HTTP client with HTTP/2 support and fallback
 try:
     _HTTP_CLIENT = httpx.Client(http2=True, verify=False, timeout=httpx.Timeout(600.0))
 except ImportError:
-    import sys
-
     print(
         "⚠️  The 'h2' package is not installed — falling back to HTTP/1.1. "
         "Install it (e.g. `pip install h2` or `uv pip install h2`) to enable HTTP/2.",
         file=sys.stderr,
     )
     _HTTP_CLIENT = httpx.Client(http2=False, verify=False, timeout=httpx.Timeout(600.0))
-# ==============================================================================
 
-PROMPTS_DIR = RESEARCH_DIR / "prompts"
-REPORTS_DIR = RESEARCH_DIR / "reports"
 
-# Ensure directories exist
-PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+def get_provider_config(provider_override: str = "auto") -> tuple[str, str, str, dict]:
+    """
+    Resolves the active provider, interaction URL, download URL, and auth headers.
+    Returns: (provider_name, gateway_url, download_url_template, headers)
+    """
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    lr_key = os.getenv("LITEROUTER_AUTH_KEY", "").strip()
+    lr_host = os.getenv("LITEROUTER_HOST", "literouter.lan").strip()
+    lr_port = os.getenv("LITEROUTER_PORT", "7766").strip()
+    google_base = os.getenv("GOOGLE_NATIVE_BASE_URL", "https://generativelanguage.googleapis.com").strip()
 
-# Instruct the agent to natively build the files and save them to its disk
+    choice = provider_override.lower()
+    if choice == "auto":
+        if gemini_key:
+            choice = "gemini"
+        elif lr_key:
+            choice = "literouter"
+        else:
+            choice = "none"
+
+    if choice == "gemini":
+        if not gemini_key:
+            raise ValueError(
+                "Gemini provider selected but GEMINI_API_KEY is not set.\n"
+                "Please set GEMINI_API_KEY in your .env file or environment."
+            )
+        gateway_url = f"{google_base}/v1beta/interactions"
+        download_url = f"{google_base}/v1beta/files/environment-{{env_id}}:download?alt=media"
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": gemini_key,
+        }
+        return "gemini", gateway_url, download_url, headers
+
+    elif choice == "literouter":
+        if not lr_key:
+            raise ValueError(
+                "LiteRouter provider selected but LITEROUTER_AUTH_KEY is not set.\n"
+                "Please set LITEROUTER_AUTH_KEY in your .env file or environment."
+            )
+        gateway_url = f"http://{lr_host}:{lr_port}/v1beta/interactions"
+        download_url = f"http://{lr_host}:{lr_port}/v1beta/files/environment-{{env_id}}:download?alt=media"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {lr_key}",
+            "x-goog-api-key": lr_key,
+        }
+        return "literouter", gateway_url, download_url, headers
+
+    else:
+        raise ValueError(
+            "❌ No API credentials found!\n\n"
+            "Please configure credentials using one of the following methods:\n"
+            "  1. Public Community Mode (Direct Google Gemini API):\n"
+            "     Set GEMINI_API_KEY in your .env file or environment.\n"
+            "  2. Private / Self-Hosted Mode (LiteRouter Gateway):\n"
+            "     Set LITEROUTER_AUTH_KEY in your .env file or environment.\n\n"
+            "See .env.example for template configurations."
+        )
+
+
+# Instruct the agent to natively build the files and save them to disk
 AGENT_FILE_INSTRUCTION = """
 \n\n======================================================================
 CRITICAL SYSTEM OVERRIDE FOR NATIVE FILE GENERATION:
@@ -92,54 +115,51 @@ You are operating in a remote code execution sandbox. You MUST natively generate
 ======================================================================
 """
 
-def download_and_extract_sandbox(env_id: str, base_output_path: Path):
-    """Downloads the full sandbox snapshot (.tar) and extracts the target files."""
-    url = FILE_DOWNLOAD_URL.format(env_id=env_id)
 
-    # Passing both standard Auth and Google's expected header just to be safe with LiteRouter
-    headers = {
-        "Authorization": f"Bearer {LITEROUTER_KEY}",
-        "x-goog-api-key": LITEROUTER_KEY,
-    }
+def download_and_extract_sandbox(
+    env_id: str,
+    base_output_path: Path,
+    download_url_template: str,
+    headers: dict,
+) -> list[Path]:
+    """Downloads the full sandbox snapshot (.tar) and extracts the target report files."""
+    url = download_url_template.format(env_id=env_id)
+    extracted_paths: list[Path] = []
 
     try:
         with _HTTP_CLIENT.stream("GET", url, headers=headers) as resp:
             if resp.status_code != 200:
                 err_body = resp.read().decode("utf-8", errors="ignore")
                 print(f"❌ Failed to download sandbox snapshot (HTTP {resp.status_code}): {err_body}")
-                return
+                return extracted_paths
 
-            # 1. Download the raw tar payload into a temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tmp_tar:
                 for chunk in resp.iter_bytes():
                     tmp_tar.write(chunk)
                 tmp_tar_path = tmp_tar.name
 
-        # 2. Extract the sandbox tar
         extract_dir = Path(tempfile.mkdtemp())
         with tarfile.open(tmp_tar_path) as tar:
             tar.extractall(path=extract_dir)
 
-        # 3. Locate the 4 specific generated files and move them to your reports folder
         formats = ["md", "html", "pdf", "docx"]
         for fmt in formats:
             target_name = f"report.{fmt}"
             found = False
 
-            # Recursively search the extracted sandbox (in case the agent put them in a subfolder)
             for root_dir, _, files in os.walk(extract_dir):
                 if target_name in files:
                     src_file = Path(root_dir) / target_name
                     final_path = base_output_path.with_suffix(f".{fmt}")
                     shutil.move(str(src_file), str(final_path))
                     print(f"✅ Extracted native file: {final_path.name}")
+                    extracted_paths.append(final_path)
                     found = True
                     break
 
             if not found:
                 print(f"⚠️ Agent failed to generate {target_name} inside the sandbox.")
 
-        # 4. Clean up temp files
         os.remove(tmp_tar_path)
         shutil.rmtree(extract_dir)
 
@@ -148,9 +168,90 @@ def download_and_extract_sandbox(env_id: str, base_output_path: Path):
     except Exception as e:
         print(f"❌ System error during extraction: {e}")
 
+    return extracted_paths
+
+
+def execute_research(
+    prompt_content: str,
+    prompt_stem: str = "custom_research",
+    output_dir: Path | str | None = None,
+    previous_interaction_id: str | None = None,
+    provider: str = "auto",
+    agent_model: str = "antigravity-preview-09-2026",
+    timeout: float = 600.0,
+) -> dict:
+    """
+    Core modular function for executing deep research.
+    Can be called directly by CLI, scripts, or future MCP servers.
+    """
+    provider_name, gateway_url, download_url_template, headers = get_provider_config(provider)
+
+    target_reports_dir = Path(output_dir) if output_dir else REPORTS_DIR
+    target_reports_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    base_output_path = target_reports_dir / f"{prompt_stem}_{timestamp}"
+    output_json_path = target_reports_dir / f"{prompt_stem}_{timestamp}_raw.json"
+
+    final_prompt = prompt_content.strip() + AGENT_FILE_INSTRUCTION
+
+    payload = {
+        "agent": agent_model,
+        "input": final_prompt,
+        "environment": "remote",
+    }
+    if previous_interaction_id:
+        payload["previous_interaction_id"] = previous_interaction_id
+
+    start_time = time.time()
+    resp = _HTTP_CLIENT.post(gateway_url, headers=headers, json=payload, timeout=timeout)
+    elapsed = time.time() - start_time
+
+    if resp.status_code >= 400:
+        raise RuntimeError(f"HTTP Error {resp.status_code} from {provider_name}: {resp.text[:500]}")
+
+    res_json = resp.json()
+    output_json_path.write_text(json.dumps(res_json, indent=2), encoding="utf-8")
+
+    env_id = res_json.get("environment_id")
+    extracted_files: list[Path] = []
+    if env_id:
+        extracted_files = download_and_extract_sandbox(
+            env_id=env_id,
+            base_output_path=base_output_path,
+            download_url_template=download_url_template,
+            headers=headers,
+        )
+
+    return {
+        "status": "completed",
+        "provider": provider_name,
+        "environment_id": env_id,
+        "elapsed_seconds": round(elapsed, 2),
+        "raw_json_path": str(output_json_path),
+        "extracted_files": [str(p) for p in extracted_files],
+        "response": res_json,
+    }
+
+
 def run_deep_research():
-    parser = argparse.ArgumentParser(description="Deep Research Agent Tool (Native Sandbox Downloads)")
-    parser.add_argument("target", help="The name of the prompt (e.g. Direction_of_JPY)")
+    """CLI entrypoint for deep research execution."""
+    parser = argparse.ArgumentParser(
+        description="Deep Research Agent Tool (Dual-Engine: Google Gemini & LiteRouter)",
+    )
+    parser.add_argument("target", help="The name of the prompt template (e.g. Direction_of_JPY)")
+    parser.add_argument(
+        "--provider",
+        choices=["auto", "gemini", "literouter"],
+        default="auto",
+        help="Inference provider: 'auto' (default: checks GEMINI_API_KEY then LiteRouter), 'gemini', or 'literouter'",
+    )
+    parser.add_argument(
+        "--previous-interaction-id",
+        dest="previous_interaction_id",
+        default=None,
+        help="Optional previous interaction ID for stateful multi-turn continuation",
+    )
     args = parser.parse_args()
 
     prompt_stem = Path(args.target).stem
@@ -160,98 +261,43 @@ def run_deep_research():
         print(f"❌ Error: Prompt template not found at {prompt_file}")
         sys.exit(1)
 
-    # Setup output paths
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    base_output_path = REPORTS_DIR / f"{prompt_stem}_{timestamp}"
-    output_json = REPORTS_DIR / f"{prompt_stem}_{timestamp}_raw.json"
-
-    original_prompt_content = prompt_file.read_text(encoding="utf-8").strip()
-
-    # Inject our command forcing the agent to build the files on its disk
-    final_prompt = original_prompt_content + AGENT_FILE_INSTRUCTION
+    try:
+        provider_name, gateway_url, _, _ = get_provider_config(args.provider)
+    except ValueError as e:
+        print(f"\n{e}\n")
+        sys.exit(1)
 
     print("==================================================================")
-    print("🔬 DEEP RESEARCH AGENT (Native Sandbox File Download Mode)")
+    print("🔬 DEEP RESEARCH AGENT (Dual-Engine Execution)")
     print("==================================================================")
-    print(f"📍 Target Gateway: {GATEWAY_URL}")
+    print(f"⚡ Provider:       {provider_name.upper()}")
+    print(f"📍 Target Gateway: {gateway_url}")
     print(f"📄 Reading Prompt: {prompt_file}")
     print(f"📁 Output Dir:     {REPORTS_DIR}")
+    if args.previous_interaction_id:
+        print(f"🔗 Stateful Turn:  Continuing interaction {args.previous_interaction_id}")
     print("==================================================================\n")
 
-    payload = {
-        "agent": "antigravity-preview-05-2026",
-        "input": final_prompt,
-        "environment": "remote",
-    }
+    prompt_content = prompt_file.read_text(encoding="utf-8").strip()
 
-    print("🚀 Dispatching request. Agent is doing research and rendering files natively...")
-    start_time = time.time()
-
-    def _process_response(resp, elapsed):
-        if resp.status_code >= 400:
-            print(f"❌ HTTP Error {resp.status_code}: {resp.text[:500]}")
-            sys.exit(1)
-        print(f"✅ Execution finished in {elapsed:.1f} seconds!")
-        res_json = resp.json()
-        # --- 1. SAVE RAW JSON FORMAT ---
-        output_json.write_text(json.dumps(res_json, indent=2), encoding="utf-8")
-        print(f"💾 Saved JSON API format to: {output_json}")
-        # --- 2. EXTRACT ENVIRONMENT ID ---
-        env_id = res_json.get("environment_id")
-        if not env_id:
-            print("❌ Error: No environment_id returned by the agent. Cannot download files.")
-            sys.exit(1)
-        # --- 3. DOWNLOAD & EXTRACT FILES DIRECTLY FROM THE AGENT'S SANDBOX ---
-        print(f"\n📦 Accessing sandbox {env_id} to download generated files...")
-        download_and_extract_sandbox(env_id, base_output_path)
+    print("🚀 Dispatching request. Agent is conducting research and rendering files...")
+    try:
+        result = execute_research(
+            prompt_content=prompt_content,
+            prompt_stem=prompt_stem,
+            previous_interaction_id=args.previous_interaction_id,
+            provider=args.provider,
+        )
+        print(f"\n✅ Execution finished in {result['elapsed_seconds']} seconds!")
+        print(f"💾 Saved JSON API format to: {result['raw_json_path']}")
+        if result["extracted_files"]:
+            print(f"📦 Extracted files: {len(result['extracted_files'])}")
         print("\n🎉 Deep Research Complete!")
         sys.exit(0)
-
-    try:
-        if GEMINI_API_KEY:
-            # Direct Gemini API — more reliable; environment lives longer for downloads.
-            resp = _HTTP_CLIENT.post(GATEWAY_URL, headers=GEMINI_HEADERS, json=payload, timeout=600.0)
-            elapsed = time.time() - start_time
-            _process_response(resp, elapsed)
-        else:
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {LITEROUTER_KEY}",
-                "x-goog-api-key": LITEROUTER_KEY,
-            }
-            resp = _HTTP_CLIENT.post(GATEWAY_URL, headers=headers, json=payload, timeout=600.0)
-            elapsed = time.time() - start_time
-            if resp.status_code >= 400:
-                print(f"❌ HTTP Error {resp.status_code}: {resp.text[:500]}")
-                sys.exit(1)
-
-            print(f"✅ Execution finished in {elapsed:.1f} seconds!")
-
-            res_json = resp.json()
-
-            # --- 1. SAVE RAW JSON FORMAT ---
-            output_json.write_text(json.dumps(res_json, indent=2), encoding="utf-8")
-            print(f"💾 Saved JSON API format to: {output_json}")
-
-            # --- 2. EXTRACT ENVIRONMENT ID ---
-            env_id = res_json.get("environment_id")
-            if not env_id:
-                print("❌ Error: No environment_id returned by the agent. Cannot download files.")
-                sys.exit(1)
-
-            # --- 3. DOWNLOAD & EXTRACT FILES DIRECTLY FROM THE AGENT'S SANDBOX ---
-            print(f"\n📦 Accessing sandbox {env_id} to download generated files...")
-            download_and_extract_sandbox(env_id, base_output_path)
-
-            print("\n🎉 Deep Research Complete!")
-            sys.exit(0)
-
-    except httpx.HTTPError as e:
-        print(f"❌ HTTP Error: {e}")
-        sys.exit(1)
     except Exception as e:
-        print(f"❌ Execution Error: {e}")
+        print(f"\n❌ Execution Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     run_deep_research()

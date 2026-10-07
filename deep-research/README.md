@@ -1,72 +1,80 @@
-# Deep Research Tool (LiteRouter + Antigravity)
+# Deep Research Tool (Dual-Engine: Google Gemini & LiteRouter)
 
-This directory contains the tools necessary to execute **Institutional-Grade Deep Research** using the local LiteRouter API gateway and the `antigravity-preview-05-2026` agent.
+This tool executes **Institutional-Grade Deep Research** using Google's Antigravity sandbox (`antigravity-preview-09-2026`) via the `/v1beta/interactions` endpoint.
 
-The tool automates the process of orchestrating a multi-perspective "Persona Council" (Tech, Macro, Quant, Risk, and Bear Case) to research complex topics, fetch live data via Google Search, and synthesize a comprehensive, cited Markdown whitepaper.
+It automates orchestrating a multi-perspective "Persona Council" (5 specialized domain experts) to research complex topics, fetch live web data via search, and synthesize a comprehensive, cited whitepaper natively compiled into Markdown, HTML, PDF, and DOCX.
+
+---
+
+## ⚡ Inference Modes
+
+1. **Public Community Mode (Default)**: Connects directly to Google Gemini API (`https://generativelanguage.googleapis.com`) using `GEMINI_API_KEY`.
+2. **Self-Hosted Mode (LiteRouter)**: Connects to your local or private LiteRouter gateway using `LITEROUTER_AUTH_KEY`.
+
+---
 
 ## 📂 Core Components
 
 1. **`prompts/` directory** 
-   - Stores your target research prompts. 
-   - A template guide is available at `prompts/_template_guide.md` to teach you how to write an effective institutional-grade prompt with 5 tailored personas.
+   - Stores target research prompts (`prompts/*.md`).
+   - `prompts/_template_guide.md` provides the structural template for writing effective prompts with 5 tailored personas.
 2. **`deep-research.py`**
-   - The Python execution script. It reads your specific prompt file, dispatches it to the local LiteRouter gateway, and waits for the agent to finish its multi-step execution.
-3. **`reports/` directory** (Generated)
-   - The script outputs the final synthesized whitepaper here as a Markdown file, timestamped for historical tracking (e.g., `Direction_of_JPY_YYYYMMDD_HHMM.md`).
-   - It also saves the raw JSON response (`..._raw.json`) alongside the report for debugging or re-rendering.
+   - The execution script. Reads prompt files, resolves provider credentials, executes the interaction, and extracts compiled sandbox artifacts.
+   - Also exports `execute_research(...)` for programmatic Python use or MCP integration.
+3. **`reports/` directory** (Generated & gitignored)
+   - Outputs the final whitepapers here: `.md`, `.html`, `.pdf`, `.docx`, and `_raw.json`.
 4. **`run.sh`**
-   - A batch-execution shell script. You can configure this script with a list of prompts and run it manually or via a weekly cron job.
+   - Batch runner shell script for scheduling research across multiple topics.
 
-## 🚀 How to Use (For Humans)
+---
 
-1. **Ensure the Gateway is running:**
-   The LiteRouter gateway must be running locally (usually on port 7766).
-   ```bash
-   # From the project root
-   bash scripts/start.sh
-   # OR
-   bun run src/index.ts
-   ```
+## 🚀 Quick Start
 
-2. **Create your Prompt:**
-   - Copy `prompts/_template_guide.md` to a new file, e.g., `prompts/Direction_of_JPY.md`.
-   - Modify the **"OBJECTIVE & TARGET TOPIC"** and customize the **5 Personas** so they fit your domain.
-
-3. **Run the Script:**
-   Execute the script and pass the name of your prompt. 
-   ```bash
-   uv run python research/deep-research.py Direction_of_JPY
-   ```
-   *(Note: This process takes 1-3 minutes. It can safely be run via cron jobs using the included `run.sh` wrapper).*
-
-4. **Review the Results:**
-   Open the generated file in `reports/` to read the whitepaper.
-
-### Offline / Transform Mode
-If you want to re-generate the Markdown report from an existing raw JSON file (e.g., if you tweaked the markdown generation logic in the python script) without hitting the API again:
+### 1. Configure Credentials
+Copy `.env.example` in the repository root to `.env`:
 ```bash
-uv run python research/deep-research.py --transform research/reports/Direction_of_JPY_20260729_1430_raw.json
+cp .env.example .env
+```
+Set your `GEMINI_API_KEY` (or `LITEROUTER_AUTH_KEY`).
+
+### 2. Create a Research Prompt
+Copy the template guide to a new file:
+```bash
+cp deep-research/prompts/_template_guide.md deep-research/prompts/My_Topic.md
+```
+Edit `My_Topic.md` to define your research objective and customize the 5 personas.
+
+> **💡 Pro-Tip:** Ask your LLM (Claude, ChatGPT, Gemini):
+> *"Read `deep-research/prompts/_template_guide.md` and generate 5 adversarial expert personas tailored for researching [YOUR TOPIC]."*
+
+### 3. Run the Research
+```bash
+uv run python deep-research/deep-research.py My_Topic
+```
+To force a specific provider:
+```bash
+uv run python deep-research/deep-research.py My_Topic --provider gemini
+# or
+uv run python deep-research/deep-research.py My_Topic --provider literouter
 ```
 
-## 🤖 Instructions for AI Agents
+### 4. Review Results
+Check `deep-research/reports/`:
+- `My_Topic_TIMESTAMP.md`
+- `My_Topic_TIMESTAMP.html`
+- `My_Topic_TIMESTAMP.pdf`
+- `My_Topic_TIMESTAMP.docx`
 
-When a user asks you to "conduct deep research", "research a topic", or "run the deep research tool":
+---
 
-1. **Target Topic Alignment:**
-   - Create a new file in `research/prompts/` (e.g., `research/prompts/Topic_Name.md`) using `_template_guide.md` as your structural template.
-   - You MUST fill out the entire file, including customizing the 5 Personas to match the user's specific request.
-2. **Execution:**
-   - Run the script: `uv run python research/deep-research.py Topic_Name`
-   - *Note: Do not run it in the background (`&`) unless you are explicitly tracking the process, as you need to wait for it to finish to verify the output.*
-3. **Verification & Delivery:**
-   - Verify that the report was successfully generated in `research/reports/`.
-   - Read the generated report to confirm it looks correct, and inform the user that the research is complete.
+## 🔌 Programmatic Usage
 
-## 🔧 Environment Variables
+```python
+from deep_research import execute_research
 
-Since this tool communicates with the LiteRouter gateway, it needs to know where to send requests.
-
-1. Copy `.env.example` to `.env` in the root of your repository.
-2. Ensure the following variables are set:
-   - `LITEROUTER_PORT` (Default: `7766`)
-   - `LITEROUTER_AUTH_KEY` (Default: `YOUR_KEY_HERE`)
+result = execute_research(
+    prompt_content="Analyze impacts of quantum cryptography on financial networks...",
+    prompt_stem="quantum_finance",
+)
+print("Saved reports:", result["extracted_files"])
+```

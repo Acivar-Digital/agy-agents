@@ -1,44 +1,39 @@
 ---
 name: agy-agents
-description: Use the agy-agents toolkit — run the Deep Research agent, create prompts, transform results, or auto-refactor Python code. Use when the user asks to conduct deep research, refactor code, or use the agy-agents project.
-compatibility: Requires Python 3.10+, uv, and a running LiteRouter gateway (port 7766) with Antigravity sandbox access.
+description: Use the agy-agents toolkit — run the Deep Research agent, create prompts, transform results, or auto-refactor Python code. Supports Google Gemini API directly or via self-hosted LiteRouter.
+compatibility: Requires Python 3.10+, uv or pip, and GEMINI_API_KEY (or LiteRouter gateway).
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   author: Acivar Digital
 ---
 
 # agy-agents — Agent Toolkit Skill
 
-This skill teaches agents how to use the **agy-agents** project: a collection of standalone agentic workflows that run against the LiteRouter API Gateway using Google's Antigravity sandbox.
+This skill teaches agents how to use the **agy-agents** project: a collection of standalone agentic workflows that run against Google's Antigravity sandbox (`antigravity-preview-09-2026`) via the `/v1beta/interactions` endpoint.
+
+It supports dual-engine execution:
+1. **Direct Google Gemini API (Default for Community)**: `GEMINI_API_KEY`
+2. **Self-Hosted Gateway (LiteRouter)**: `LITEROUTER_AUTH_KEY` + `LITEROUTER_HOST`
 
 ## Available Agents
 
-### 1. Deep Research (Institutional Protocol)
+### 1. Deep Research (Council Protocol)
 
-A multi-persona research council workflow that leverages Antigravity's web-search and sandbox execution to produce heavily cited, institutional-grade whitepapers.
+A multi-persona research council workflow that leverages Antigravity's live web-search and sandbox execution to produce heavily cited, institutional-grade whitepapers compiled natively into Markdown, HTML, PDF, and DOCX.
 
-### 2. Refactor (Auto-Refactoring Pipeline)
+### 2. Refactor (Autonomous Auto-Refactoring Pipeline)
 
-An autonomous agent pipeline that reads Python files, sends them to Antigravity for clean refactoring (PEP 8, type hints, docstrings, clean architecture), and writes the results back to disk.
+An autonomous agent pipeline that reads Python files, sends them to Antigravity for clean refactoring (PEP 8, type hints, docstrings, clean architecture), and writes the results back to disk. Supports both direct CLI execution and manifest-driven batch processing.
 
 ## How to Use — Deep Research
 
 ### Prerequisites
 
-Ensure the LiteRouter gateway is running locally on port 7766:
-
+Configure credentials in `.env`:
 ```bash
-bash scripts/start.sh
-# OR
-bun run src/index.ts
-```
-
-Configure the environment:
-
-```bash
-cp deep-research/.env.example deep-research/.env
-# Edit deep-research/.env with your LITEROUTER_PORT and LITEROUTER_AUTH_KEY
+cp .env.example .env
+# Set GEMINI_API_KEY (or LITEROUTER_AUTH_KEY)
 ```
 
 ### Create a Research Prompt
@@ -48,7 +43,7 @@ Prompts live in `deep-research/prompts/`. Each prompt defines a topic and a 5-pe
 To create a new prompt:
 1. Copy `deep-research/prompts/_template_guide.md` to a new file in `deep-research/prompts/` (e.g., `deep-research/prompts/My_Topic.md`).
 2. Fill in the topic, customize the 5 personas, and set the rubric target.
-3. Save the file — no extensions needed (the `.md` suffix is conventional).
+3. *Tip for users & agents:* Use an LLM to generate domain-tailored adversarial personas.
 
 ### Run the Deep Research Agent
 
@@ -56,138 +51,62 @@ To create a new prompt:
 uv run python deep-research/deep-research.py My_Topic
 ```
 
-This dispatches the prompt to the Antigravity agent via LiteRouter. The agent will:
+The agent will:
 - Run a 50-source research sprint across 5 personas
 - Aggregate findings
-- Perform a supervisor review with one revision cycle
-- Output a structured Markdown whitepaper
+- Perform supervisor review with revision cycles
+- Output Markdown, HTML, PDF, and DOCX files in `deep-research/reports/`
 
-**Important:** Do not run the agent in the background (`&`). You must wait for it to finish so you can verify the output.
+**Important:** Do not run the agent in the background (`&`). Wait for it to finish and verify output.
 
 ### Review Results
 
-Reports are saved in `deep-research/reports/` with timestamps:
-- `My_Topic_YYYYMMDD_HHMM.md` — the final whitepaper
-- `My_Topic_YYYYMMDD_HHMM_raw.json` — the raw API response for debugging
-
-### Re-generate from Raw JSON (Offline Transform Mode)
-
-If you want to re-render the Markdown report without hitting the API again:
-
-```bash
-uv run python deep-research/deep-research.py --transform deep-research/reports/My_Topic_YYYYMMDD_HHMM_raw.json
-```
-
-### Batch Execution
-
-Configure `deep-research/run.sh` with your list of prompts, then run:
-
-```bash
-bash deep-research/run.sh
-```
+Reports are saved in `deep-research/reports/`:
+- `My_Topic_YYYYMMDD_HHMM.md` — Markdown whitepaper
+- `My_Topic_YYYYMMDD_HHMM.html` / `.pdf` / `.docx` — Compiled report formats
+- `My_Topic_YYYYMMDD_HHMM_raw.json` — Raw interaction log
 
 ## How to Use — Refactor
 
-### Prerequisites
-
-The LiteRouter gateway must be running on port 7766 with Antigravity sandbox access.
+### Mode 1: Single File Direct CLI
 
 ```bash
-cp refactor/.env.example refactor/.env
-```
-
-### Refactor a Single File
-
-```bash
+# Refactors the file into path/to/script_refactored.py
 uv run python refactor/refactor.py path/to/script.py
+
+# Optional: provide custom prompt on the fly
+uv run python refactor/refactor.py path/to/script.py --prompt "Refactor to Pydantic v2 schemas and strict typing"
+
+# Optional: overwrite in-place
+uv run python refactor/refactor.py path/to/script.py --inplace
 ```
 
-The script sends the file to the **LiteRouter `/v1beta/interactions` endpoint** (not the OpenAI chat completions endpoint). It uses the `antigravity-preview-05-2026` agent with an interaction payload of `{agent, input, environment}`. The response is parsed from the interaction's `output_text` or `steps[].model_output` to extract the refactored code. The script then saves it as `script_refactored.py` in the same directory.
-
-The prompt file `refactor/prompt.txt` (editable) contains the agent's system instructions — it gets prepended to the user message and controls how the agent refactors the code.
-
-### Refactor an Entire Directory
+### Mode 2: Batch Processing via Manifests
 
 ```bash
-uv run python refactor/refactor.py path/to/src/
+# Run all manifests in refactor/manifests/*.json
+uv run python refactor/refactor.py
+
+# Or run a specific manifest
+uv run python refactor/refactor.py --manifest refactor/manifests/my_task.json
 ```
 
-Uses the `/v1beta/interactions` endpoint — same agent, same payload format, just applied to every `.py` file found recursively. Generates a batch report at `refactor/reports/batch_report_*.md`.
-
-### Offline Transform Mode
-
-Re-render code from a saved raw API response without hitting the API:
-
-```bash
-uv run python refactor/refactor.py --transform refactor/reports/some_run_raw.json
-```
-
-Uses `extract_output_text()` to parse the interaction response and prints the refactored code to stdout. No API call is made.
-
-### Safety Rules
+### Safety Rules for Refactoring
 
 When a user asks to "refactor code" or "improve code quality":
-
 1. **Always read the file first** — do not send a file you haven't read.
 2. **Output only raw code** — remove Markdown fences and conversational text.
 3. **Verify the output is valid Python** — check for syntax errors before writing.
 4. **Never delete required logic** — only restructure, rename, and add type hints.
 5. **Show the diff** — run `git diff` after writing and present it to the user.
-6. **Run tests if available** — if `pytest` or `unittest` is present, run the relevant tests and fix any failures before finalizing.
-
-## Agent-Specific Instructions
-
-### When to Use Each Agent
-
-| Request | Agent |
-|---|---|
-| "research a topic" / "conduct deep research" | Deep Research |
-| "refactor code" / "improve code quality" | Refactor |
-
-### Research Workflow Rules
-
-1. **Target Topic Alignment:** Create a prompt file in `deep-research/prompts/` using the template guide. Customize all 5 personas for the user's domain.
-2. **Execution:** Run `uv run python deep-research/deep-research.py PromptName`. Wait for completion — do not background the process.
-3. **Verification:** Check that the report exists in `deep-research/reports/`. Read it to confirm correctness before delivering to the user.
-
-### Refactor Workflow Rules
-
-1. **Read first:** Always read the target file before sending it to the agent.
-2. **Wait for completion:** Do not run refactoring in the background.
-3. **Review the diff:** Always run `git diff` after the agent writes the refactored file.
-4. **Test if possible:** If a test suite exists, run it on the refactored files before finalizing.
-
-## Project Structure
-
-```
-agy-agents/
-├── .opencode/skills/agy-agents/
-│   └── SKILL.md          ← This file
-├── deep-research/
-│   ├── deep-research.py  ← Core Python script
-│   ├── run.sh            ← Batch runner
-│   ├── .env.example      ← Environment template
-│   ├── prompts/
-│   │   ├── _template_guide.md  ← Prompt template guide
-│   │   └── *.md             ← User prompts (Topic_Name.md)
-│   └── reports/           ← Generated reports (gitignored)
-│       ├── *.md
-│       └── *_raw.json
-├── refactor/
-│   ├── prompt.txt         ← Default system prompt (editable)
-│   ├── refactor.py        ← Reusable auto-refactor script
-│   ├── .env.example       ← Environment template
-│   ├── INSTRUCTIONS.md    ← Multi-agent refactoring guide
-│   └── reports/           ← Generated reports (gitignored)
-│       └── batch_report_*.md
-├── README.md
-├── AGENTS.md
-└── .gitignore
-```
+6. **Run tests if available** — if `pytest` or `unittest` is present, run the relevant tests.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
+| `GEMINI_API_KEY` | *(empty)* | Google Gemini API key (Public community mode) |
+| `LITEROUTER_HOST` | `literouter.lan` | Host of the LiteRouter gateway |
 | `LITEROUTER_PORT` | `7766` | Port of the LiteRouter gateway |
-| `LITEROUTER_AUTH_KEY` | `YOUR_KEY_HERE` | Bearer token for LiteRouter auth |
+| `LITEROUTER_AUTH_KEY` | *(empty)* | LiteRouter authorization key (Self-hosted mode) |
+| `AGENT_MODEL` | `antigravity-preview-09-2026` | Agent model / profile name |

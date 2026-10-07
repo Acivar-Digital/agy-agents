@@ -1,0 +1,12 @@
+{
+  "project_folder": ".",
+  "targets": [
+    "path/to/target_file.py"
+  ],
+  "reference_files": [
+    "path/to/reference_file.py"
+  ],
+  "prompt": "You are a Senior Python Architect.\n\n## TASK\nRefactor the TARGET FILE following these engineering standards:\n1. Adhere to PEP 8 standards with idiomatic naming.\n2. Add complete type annotations (including return types) for all functions and classes.\n3. Decouple business logic from external side-effects.\n4. Eliminate duplicated code and extract clean helper functions where appropriate.\n\n## OUTPUT FORMAT\nCRITICAL: Output ONLY the raw, refactored Python code. Do not include markdown code fences or conversational explanation.",
+  "output_dir": "refactor/output",
+  "output_naming": "{stem}_refactored"
+}
