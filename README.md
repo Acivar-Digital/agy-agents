@@ -185,7 +185,7 @@ This repository provides an open architecture. **We encourage you to use your fa
 
 ### ⚡ Hybrid Architecture (No 60-Second Timeout Drops)
 Standard MCP clients enforce a strict 60-second RPC timeout. Because the 5-persona research council conducts 50 live Google searches and sandbox document compilation (taking ~3–8 minutes), `agy-mcp` implements a **hybrid execution protocol**:
-- **`prepare_research_prompt`**: (<1s) Dynamically crafts and saves a Citi-grade 5-persona research prompt file in `deep-research/prompts/<stem>.md` and provides the exact background CLI command.
+- **`prepare_research_prompt`**: (<1s) Dynamically crafts and saves a 5-persona research prompt file in `deep-research/prompts/<stem>.md` and provides the exact CLI command.
 - **`start_research`**: (<1s) Spawns an asynchronous background worker and immediately returns a unique `job_id`, preventing client RPC timeout errors.
 - **`get_research_status`**: Queries job progress, returns execution elapsed time, and delivers the synthesized executive summary and paths to compiled artifacts (`.md`, `.html`, `.pdf`, `.docx`) upon completion.
 - **`refactor_code`**: (5–15s) Synchronous, high-speed code refactoring with AST syntax validation and unified diff preview.

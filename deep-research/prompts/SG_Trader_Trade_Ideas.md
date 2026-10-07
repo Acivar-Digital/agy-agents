@@ -8,21 +8,21 @@ Conduct an institutional-grade deep research investigation on:
 
 ---
 
-## 2. CITI EDITORIAL SCHEMA & FORMATTING MANDATES
-The final deliverable MUST strictly adhere to the editorial standards of **Citi Institutional Research**:
+## 2. EDITORIAL SCHEMA & FORMATTING MANDATES
+The final deliverable MUST strictly adhere to rigorous institutional research standards:
 
-1. **Institutional Header Block**:
+1. **Header Block**:
 ```markdown
-# CITI INSTITUTIONAL DEEP RESEARCH | TRADE IDEAS — SGD 50K IBKR PORTFOLIO
-**Classification:** CONFIDENTIAL / INSTITUTIONAL INVESTMENT RESEARCH
+# DEEP RESEARCH | TRADE IDEAS — SGD 50K IBKR PORTFOLIO
+**Classification:** CONFIDENTIAL / INVESTMENT RESEARCH
 **Rating Outlook:** [ACCELERATING / NEUTRAL / BEARISH] | **Target Horizon:** 3–12 months
 **Coverage:** FX Majors & Crosses, Gold CFD, CME Mini Futures (ES, NQ, YM, RTY, ZC, ZW, CL), SGX Mini Futures
 **Portfolio:** SGD 50,000 IBKR Retail Account
 ```
 
-2. **Citi Investment Thesis Callout Box**:
+2. **Investment Thesis Callout Box**:
 ```markdown
-> 📌 **CITI INVESTMENT THESIS & CORE TAKEAWAYS**
+> 📌 **INVESTMENT THESIS & CORE TAKEAWAYS**
 > • **Core Verdict:** [2-sentence institutional summary on the highest-conviction trade ideas]
 > • **Top 3 Trade Ideas:** [Each with instrument, direction, entry, target, stop, R:R]
 > • **Expected Portfolio Return (12m):** [Base / Bull / Bear scenarios in % and SGD]
@@ -49,7 +49,7 @@ For each of the 5 personas defined below, you must independently execute their r
 - **Rule:** Store each persona's "Thick Dossier" of findings in your internal memory/scratchpad. Do not summarize yet.
 
 ### Phase 2: The Aggregator
-Act as the Lead Editor for Citi Global Research. Combine the 5 Persona Dossiers into a massive, highly detailed draft.
+Act as the Lead Editor for Global Research. Combine the 5 Persona Dossiers into a massive, highly detailed draft.
 - **Rule:** Do NOT aggressively summarize or refactor. The report must be "thick", preserving granular numbers, prices, spreads, margin figures, and quotes gathered by each persona.
 
 ### Phase 3: Supervisor Review & Committee Vote
@@ -89,7 +89,7 @@ Output the final, approved Markdown report. The synthesized report follows the S
 ## 5. RUBRIC CUBE EVALUATION (Target Minimum Score: 4.5 / 5.0)
 1. **Source Diversity:** Minimum 50 distinct sources utilized and cited (IBKR margin schedules, CME/SGX contract specs, Reuters/Bloomberg, central bank statements, CFTC, FOMC dots, SGX).
 2. **Quantitative Rigor:** 100% of trade ideas backed by explicit entry, stop, target, size, margin, and SGD-equivalent risk. No vague "buy gold" — give the exact price, lot size, and SGD risk.
-3. **Citi Editorial Quality:** Includes Citi header, thesis callout box, multi-column trade comparison matrix, and scenario modeling.
+3. **Editorial Quality:** Includes header, thesis callout box, multi-column trade comparison matrix, and scenario modeling.
 4. **Recency:** Real-time data targeting August 2026 baselines and 3–12 month forward horizon.
 5. **Multi-Perspective Balance:** Explicit inclusion of Council Consensus AND Bear Case Dissent.
 6. **Actionability:** Every idea must be executable on IBKR with the stated account size.

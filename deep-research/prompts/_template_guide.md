@@ -1,4 +1,4 @@
-# CITI INSTITUTIONAL DEEP RESEARCH PROTOCOL: TEMPLATE GUIDE
+# DEEP RESEARCH PROTOCOL: TEMPLATE GUIDE
 
 **Instructions for humans:** 
 Duplicate this file, rename it (e.g., `Direction_of_JPY.md`), and fill out the bracketed `[...]` sections. 
@@ -11,21 +11,21 @@ Conduct an institutional-grade deep research investigation on:
 
 ---
 
-## 2. CITI EDITORIAL SCHEMA & FORMATTING MANDATES
-The final deliverable MUST strictly adhere to the editorial standards of **Citi Institutional Research**:
+## 2. EDITORIAL SCHEMA & FORMATTING MANDATES
+The final deliverable MUST strictly adhere to rigorous institutional research standards:
 
-1. **Institutional Header Block**:
+1. **Header Block**:
    ```markdown
-   # CITI INSTITUTIONAL DEEP RESEARCH | [INSERT SECTOR / COVERAGE DOMAIN]
-   **Classification:** CONFIDENTIAL / INSTITUTIONAL INVESTMENT RESEARCH
+   # DEEP RESEARCH | [INSERT SECTOR / COVERAGE DOMAIN]
+   **Classification:** CONFIDENTIAL / RESEARCH
    **Rating Outlook:** [ACCELERATING / NEUTRAL / BEARISH] | **Target Horizon:** [TIMEFRAME e.g. 2026–2036]
    **Coverage:** [INSERT KEY THEMES & COVERAGE SCOPE]
    ```
 
-2. **Citi Investment Thesis Callout Box**:
+2. **Investment Thesis Callout Box**:
    Include a mandatory executive box immediately following the header:
    ```markdown
-   > 📌 **CITI INVESTMENT THESIS & CORE TAKEAWAYS**
+   > 📌 **INVESTMENT THESIS & CORE TAKEAWAYS**
    > • **Core Verdict:** [2-sentence institutional summary on overall thesis & outlook]
    > • **Forecast Range / Target:** [Base / Bull / Bear Quantitative Scenarios]
    > • **Dominant Growth Vector / Catalyst:** [Primary market or regulatory accelerant]
@@ -52,7 +52,7 @@ For each of the 5 personas defined below, you must independently execute their r
 - **Rule:** Store each persona's "Thick Dossier" of findings in your internal memory/scratchpad. Do not summarize yet.
 
 ### Phase 2: The Aggregator 
-Act as the Lead Editor for Citi Global Research. Combine the 5 Persona Dossiers into a massive, highly detailed draft. 
+Act as the Lead Editor for Global Research. Combine the 5 Persona Dossiers into a massive, highly detailed draft. 
 - **Rule:** Do NOT aggressively summarize or refactor. The report must be "thick", preserving granular numbers, formulas, entity names, pricing, and quotes gathered by each persona.
 
 ### Phase 3: Supervisor Review & Committee Vote
@@ -93,7 +93,7 @@ Output the final approved report following Section 6 structure. After Sources & 
 ## 5. RUBRIC CUBE EVALUATION (Target Minimum Score: 4.8 / 5.0)
 1. **Source Diversity:** Minimum 50 distinct sources utilized and cited.
 2. **Quantitative Rigor:** 100% of claims backed by numerical data, percentages, pricing, and exact units.
-3. **Citi Editorial Quality:** Includes Citi header, thesis callout box, multi-column comparison matrices, and scenario modeling.
+3. **Editorial Quality:** Includes header, thesis callout box, multi-column comparison matrices, and scenario modeling.
 4. **Recency:** Real-time data targeting [INSERT RELEVANT TIMEFRAME].
 5. **Multi-Perspective Balance:** Explicit inclusion of Council Consensus AND Bear Case Dissent.
 
@@ -101,12 +101,12 @@ Output the final approved report following Section 6 structure. After Sources & 
 
 ## 6. REQUIRED REPORT STRUCTURE
 Synthesize the final output into a clean Markdown whitepaper with the following sections:
-1. **Citi Cover Header & Executive Investment Thesis Box**
+1. **Cover Header & Executive Investment Thesis Box**
 2. **Section I: [Topic Specific Section 1 - with quantitative comparison table]**
 3. **Section II: [Topic Specific Section 2 - with regulatory/policy timeline matrix]**
 4. **Section III: [Topic Specific Section 3 - with 10-year market sizing & CAGR table]**
 5. **Section IV: [Topic Specific Section 4 - with cost/capacity breakdown table]**
-6. **Section V: Citi Sensitivity Matrix — Bull / Base / Bear Scenarios**
+6. **Section V: Sensitivity Matrix — Bull / Base / Bear Scenarios**
 7. **Section VI: Council Consensus & Bear Case Dissent Matrix**
 8. **Section VII: Supervisor Scorecard & Revision Log**
 9. **Sources & References** (50+ verified citations with URLs)

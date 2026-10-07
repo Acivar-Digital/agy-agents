@@ -55,7 +55,7 @@ Lists all available structured research prompt templates and stems in `deep-rese
 - **Parameters**: None.
 
 ### 3. `prepare_research_prompt`
-Generates and validates an institutional Citi-grade 5-persona research prompt file in `deep-research/prompts/<prompt_stem>.md`, explains how the workflow operates, and returns the exact CLI command to trigger.
+Generates and validates an institutional 5-persona research prompt file in `deep-research/prompts/<prompt_stem>.md`, explains how the workflow operates, and returns the exact CLI command to trigger.
 - **Parameters**:
   - `topic` (`str`, required): Core research subject or question for the 5-persona research council.
   - `prompt_stem` (`str`, default `"custom_research"`): File stem for the generated prompt file (e.g. `"Direction_of_JPY"`).

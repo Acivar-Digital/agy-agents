@@ -1,4 +1,4 @@
-# CITI INSTITUTIONAL DEEP RESEARCH PROTOCOL: PERSONA COUNCIL & RISK COMMITTEE
+# DEEP RESEARCH PROTOCOL: PERSONA COUNCIL & RISK COMMITTEE
 
 ## 1. OBJECTIVE & TARGET TOPIC
 Conduct an institutional-grade deep research investigation on:
@@ -6,21 +6,21 @@ Conduct an institutional-grade deep research investigation on:
 
 ---
 
-## 2. CITI EDITORIAL SCHEMA & FORMATTING MANDATES
-The final deliverable MUST strictly adhere to the editorial standards of **Citi Institutional Research**:
+## 2. EDITORIAL SCHEMA & FORMATTING MANDATES
+The final deliverable MUST strictly adhere to rigorous institutional research standards:
 
-1. **Institutional Header Block**:
+1. **Header Block**:
    ```markdown
-   # CITI INSTITUTIONAL DEEP RESEARCH | Cross-Schema Trajectory Translation and Scrubbing for Gemma 
-   **Classification:** CONFIDENTIAL / INSTITUTIONAL INVESTMENT RESEARCH
+   # DEEP RESEARCH | Cross-Schema Trajectory Translation and Scrubbing for Gemma 
+   **Classification:** CONFIDENTIAL / RESEARCH
    **Rating Outlook:** [ACCELERATING / NEUTRAL / BEARISH] | **Target Horizon:** 2026–2036
    **Coverage:** Cross-Schema Trajectory Translation and Scrubbing for Gemma 4 31B QAT Rank-8 LoRA SFT: Mapping Public SWE-bench / SWE-smith Multi-Turn Python Trajectories into a Strict 5-Skill + 5-Tool ADK Contract
    ```
 
-2. **Citi Investment Thesis Callout Box**:
+2. **Investment Thesis Callout Box**:
    Include a mandatory executive box immediately following the header:
    ```markdown
-   > 📌 **CITI INVESTMENT THESIS & CORE TAKEAWAYS**
+   > 📌 **INVESTMENT THESIS & CORE TAKEAWAYS**
    > • **Core Verdict:** [2-sentence institutional summary on overall thesis & outlook]
    > • **Forecast Range / Target:** [Base / Bull / Bear Quantitative Scenarios]
    > • **Dominant Growth Vector / Catalyst:** [Primary market or regulatory accelerant]
@@ -75,7 +75,7 @@ Focus on: (1) Exact Hugging Face dataset selection (e.g., SWE-bench/SWE-smith-tr
 ---
 
 ## 6. REQUIRED REPORT STRUCTURE
-1. **Citi Cover Header & Executive Investment Thesis Box**
+1. **Cover Header & Executive Investment Thesis Box**
 2. **Section I: Technical & Architectural Breakdown (with benchmark comparison table)**
 3. **Section II: Policy, Regulatory & Geopolitical Matrix (with timeline matrix)**
 4. **Section III: Quantitative Market Sizing & Sensitivity (with Bull/Base/Bear scenarios)**

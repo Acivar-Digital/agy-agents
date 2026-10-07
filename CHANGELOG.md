@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **FastMCP Server (`agy-mcp`)**: Native Model Context Protocol server exposing sovereign tools for deep research and autonomous code refactoring.
 - **Hybrid Async Execution Architecture**: Implemented asynchronous background job management (`start_research`, `get_research_status`) to completely eliminate client-side 60s RPC timeout disconnects during extensive multi-persona research runs.
-- **Domain-Tailored Prompt Sculptor**: Added `prepare_research_prompt` to generate institutional Citi-grade 5-persona prompts with ready-to-run background CLI commands.
+- **Domain-Tailored Prompt Sculptor**: Added `prepare_research_prompt` to generate institutional 5-persona prompts with ready-to-run background CLI commands.
 - **Synchronous Autonomous Refactoring Tool**: Added `refactor_code` MCP tool with AST syntax verification, PEP 8 enforcement, and unified diff output.
 - **Diagnostic & Discovery Tools**: Added `check_gateway_health` for LiteRouter / Gemini latency inspection and `list_research_prompts` for discovering existing structured prompt templates.
 - **Remote VPS Deployment**: Deployed and verified to `vps466a:/home/vps466a/services/agy-agents` routed against LiteRouter at `literouter.lan:7766`.

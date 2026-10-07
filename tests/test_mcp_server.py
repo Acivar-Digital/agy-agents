@@ -145,7 +145,7 @@ class TestMCPToolsExecution(unittest.TestCase):
         content = self.test_prompt_file.read_text(encoding="utf-8")
         self.assertIn("Next-generation Optical Interconnects", content)
         self.assertIn("Co-Packaged Optics", content)
-        self.assertIn("CITI INSTITUTIONAL DEEP RESEARCH PROTOCOL", content)
+        self.assertIn("DEEP RESEARCH PROTOCOL", content)
 
     def test_list_research_prompts(self):
         res = list_research_prompts()
