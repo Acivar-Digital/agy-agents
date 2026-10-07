@@ -1,7 +1,7 @@
 """
 Modular import package for the autonomous refactoring engine.
 Allows standard Python imports:
-    from refactor import execute_refactor
+    from refactor import execute_refactor, main
 """
 from refactor.refactor import (
     execute_refactor,
@@ -12,6 +12,7 @@ from refactor.refactor import (
     refactor_with_manifest,
     load_manifest,
     load_manifests,
+    main,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "refactor_with_manifest",
     "load_manifest",
     "load_manifests",
+    "main",
 ]

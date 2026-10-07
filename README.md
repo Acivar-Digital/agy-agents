@@ -41,6 +41,15 @@ pip install git+https://github.com/Acivar-Digital/agy-agents.git
 uv pip install git+https://github.com/Acivar-Digital/agy-agents.git
 ```
 
+Once installed, the CLI tools are available globally in your environment:
+```bash
+# Run Deep Research
+agy-research Quantum_Computing
+
+# Run Code Refactoring
+agy-refactor path/to/script.py --prompt "Add type hints and PEP 8"
+```
+
 ### Option B: Local Developer Clone
 ```bash
 git clone https://github.com/Acivar-Digital/agy-agents.git

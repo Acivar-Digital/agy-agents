@@ -36,6 +36,10 @@ dependencies = [
     "h2>=4.1.0",
 ]
 
+[project.scripts]
+agy-research = "deep_research:run_deep_research"
+agy-refactor = "refactor:main"
+
 [project.urls]
 Homepage = "https://github.com/Acivar-Digital/agy-agents"
 Repository = "https://github.com/Acivar-Digital/agy-agents.git"
