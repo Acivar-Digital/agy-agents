@@ -12,7 +12,18 @@ from refactor.refactor import (
     refactor_with_manifest,
     load_manifest,
     load_manifests,
+    generate_batch_report,
     main,
+    # Pydantic V2 models & type aliases
+    RefactorManifest,
+    ProviderConfig,
+    InteractionRequest,
+    InteractionResponse,
+    RefactorExecutionRequest,
+    RefactorExecutionResult,
+    BatchReportItem,
+    ProviderChoice,
+    ActiveProvider,
 )
 
 __all__ = [
@@ -24,5 +35,15 @@ __all__ = [
     "refactor_with_manifest",
     "load_manifest",
     "load_manifests",
+    "generate_batch_report",
     "main",
+    "RefactorManifest",
+    "ProviderConfig",
+    "InteractionRequest",
+    "InteractionResponse",
+    "RefactorExecutionRequest",
+    "RefactorExecutionResult",
+    "BatchReportItem",
+    "ProviderChoice",
+    "ActiveProvider",
 ]

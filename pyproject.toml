@@ -1,6 +1,6 @@
 [project]
 name = "agy-agents"
-version = "1.0.0"
+version = "1.1.0"
 description = "Autonomous Deep Research Council and Code Refactoring Agents powered by Google Gemini & LiteRouter"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,6 +34,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
     "h2>=4.1.0",
+    "pydantic>=2.10.0",
 ]
 
 [project.scripts]

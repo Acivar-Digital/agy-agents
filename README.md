@@ -5,7 +5,7 @@
 **Autonomous Deep Research Council & Self-Directed Code Refactoring Agents**  
 *Powered by Google's Antigravity Sandbox (`antigravity-preview-09-2026`) via Google Gemini API & LiteRouter Gateway*
 
-[![Release](https://img.shields.io/badge/release-v1.0.0-blue.svg?style=flat-square)](https://github.com/Acivar-Digital/agy-agents/releases)
+[![Release](https://img.shields.io/badge/release-v1.1.0-blue.svg?style=flat-square)](https://github.com/Acivar-Digital/agy-agents/releases)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-brightgreen.svg?style=flat-square)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Dual Engine](https://img.shields.io/badge/Engine-Gemini%20API%20%7C%20LiteRouter-orange.svg?style=flat-square)](https://aistudio.google.com/)
@@ -172,6 +172,13 @@ print("Refactored code:\n", refactor_result["refactored_code"])
 
 ## 🏷️ Releases & Versioning
 
+### `v1.1.0` — Pydantic V2 Core Modernization *(2026-10-07)*
+- 🛡️ **Pydantic V2 Type Contracts**: Full migration to modern Pydantic V2 (`pydantic>=2.10.0`) across all workflows.
+- 🔒 **Immutable Provider Configs**: Frozen `ProviderConfig` models for both Deep Research and Refactor engines, validating URLs, placeholders, and headers.
+- 📡 **Strict Interaction Schemas**: Validated `InteractionRequest`, `InteractionStep`, and `InteractionResponse` models safeguarding communication with LiteRouter and Google Gemini `/v1beta/interactions`.
+- 📋 **Robust Manifest Validation**: Strictly validated `RefactorManifest`, `RefactorExecutionRequest`, and `RefactorExecutionResult` ensuring early detection of malformed configurations.
+- 🔄 **100% Backward Compatibility**: Native support for dict-style indexing, tuple unpacking, and existing CLI interfaces with zero breaking changes.
+
 ### `v1.0.0` — Official Production Release *(2026-10-07)*
 - 🚀 **Initial Stable Release**: First public release of `agy-agents` framework.
 - 🔑 **Zero Hardcoded Secrets**: Clean credential design with strict `.gitignore` rules.
@@ -189,7 +196,8 @@ print("Refactored code:\n", refactor_result["refactored_code"])
 agy-agents/
 ├── .env.example                    ← Universal environment template
 ├── pyproject.toml                  ← PEP 621 package metadata & dependencies
-├── requirements.txt                ← Dependencies (python-dotenv, httpx, h2)
+├── requirements.txt                ← Dependencies (python-dotenv, httpx, h2, pydantic)
+├── CHANGELOG.md                    ← Keep a Changelog documentation
 ├── deep_research.py                ← Modular programmatic import shim
 ├── deep-research/
 │   ├── deep-research.py            ← Deep research runner & execute_research()

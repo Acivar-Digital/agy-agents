@@ -6,9 +6,18 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
+from typing import Literal, TypeAlias
 from dotenv import load_dotenv
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    field_validator,
+)
 
 # ==============================================================================
 # 🔑 CONFIGURATION & ENVIRONMENT SETUP
@@ -24,11 +33,180 @@ DEFAULT_PROMPT_FILE = SCRIPT_DIR / "prompt.txt"
 AGENT_NAME = os.getenv("AGENT_MODEL", "antigravity-preview-09-2026")
 DEFAULT_TIMEOUT = int(os.getenv("TIMEOUT", "600"))
 
+# ==============================================================================
+# 📐 PYDANTIC V2 SCHEMAS & CONTRACTS
+# ==============================================================================
+ProviderChoice: TypeAlias = Literal["auto", "gemini", "literouter"]
+ActiveProvider: TypeAlias = Literal["gemini", "literouter"]
 
-def get_provider_config(provider_override: str = "auto") -> tuple[str, str, dict]:
+
+class RefactorManifest(BaseModel):
+    """Immutable, strictly validated manifest configuration for batch refactoring."""
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    prompt: str = Field(min_length=1, description="Refactoring instructions for the agent")
+    targets: list[str] = Field(min_length=1, description="Target Python files to refactor")
+    project_folder: str = Field(default=".", description="Base directory for targets and references")
+    output_dir: str = Field(default="refactor/output", description="Output directory for refactored files")
+    output_naming: str = Field(default="{stem}_refactored", description="Output filename template containing {stem}")
+    reference_files: list[str] = Field(default_factory=list, description="Optional reference files")
+
+    @field_validator("prompt", mode="after")
+    @classmethod
+    def validate_prompt(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("Manifest prompt must not be empty or whitespace only")
+        return s
+
+    @field_validator("output_naming", mode="after")
+    @classmethod
+    def validate_naming(cls, v: str) -> str:
+        if "{stem}" not in v:
+            raise ValueError("output_naming must contain '{stem}' placeholder")
+        return v
+
+    @field_validator("targets", mode="after")
+    @classmethod
+    def validate_targets(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("targets list must not be empty")
+        return v
+
+
+class ProviderConfig(BaseModel):
+    """Immutable, strictly validated configuration for an inference provider."""
+    model_config = ConfigDict(extra="forbid", validate_assignment=True, frozen=True)
+
+    provider_name: ActiveProvider
+    gateway_url: str
+    headers: dict[str, str]
+
+    @field_validator("gateway_url", mode="after")
+    @classmethod
+    def validate_gateway_url(cls, v: str) -> str:
+        v_stripped = v.strip()
+        if not (v_stripped.startswith("http://") or v_stripped.startswith("https://")):
+            raise ValueError(f"gateway_url must be an HTTP/HTTPS URL, got: {v}")
+        return v_stripped
+
+    def __iter__(self) -> Iterator[str | dict[str, str]]:
+        """Support unpacking: provider_name, gateway_url, headers = config."""
+        return iter((self.provider_name, self.gateway_url, self.headers))
+
+
+class InteractionRequest(BaseModel):
+    """Validated payload model for the LiteRouter / Gemini interactions API."""
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    agent: str = Field(min_length=1, description="Agent model identifier")
+    input: str = Field(min_length=1, description="Prompt and instructions for the agent")
+    environment: Literal["remote", "local"] = "remote"
+    previous_interaction_id: str | None = None
+
+    @field_validator("agent", "input", mode="after")
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("String field cannot be empty or whitespace only")
+        return s
+
+
+class InteractionResponse(BaseModel):
+    """Response envelope from the LiteRouter / Gemini interaction endpoint."""
+    model_config = ConfigDict(extra="ignore", validate_assignment=True)
+
+    id: str | None = None
+    object: str | None = None
+    created: int | None = None
+    model: str | None = None
+    status: str | None = None
+    steps: list[dict[str, JsonValue]] = Field(default_factory=list)
+    output_text: str | dict[str, JsonValue] | None = None
+    output: str | dict[str, JsonValue] | None = None
+    response: str | dict[str, JsonValue] | None = None
+    answer: str | dict[str, JsonValue] | None = None
+    result: str | dict[str, JsonValue] | None = None
+
+    def extract_text(self) -> str | None:
+        """Extracts raw text content from the interaction response."""
+        for v in [self.output_text, self.output, self.response, self.answer, self.result]:
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+            elif isinstance(v, dict):
+                text_or_msg = v.get("text") or v.get("message")
+                if text_or_msg and str(text_or_msg).strip():
+                    return str(text_or_msg).strip()
+
+        for step in self.steps:
+            if step.get("type") == "model_output":
+                contents = step.get("content", [])
+                parts: list[str] = []
+                if isinstance(contents, list):
+                    for c in contents:
+                        if isinstance(c, dict) and c.get("text"):
+                            parts.append(str(c["text"]).strip())
+                        elif isinstance(c, str) and c.strip():
+                            parts.append(c.strip())
+                if parts:
+                    return "\n\n".join(parts)
+            elif step.get("model_output"):
+                val = step.get("model_output")
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+
+        return None
+
+
+class RefactorExecutionRequest(BaseModel):
+    """Validated input parameters for executing a refactor."""
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    code_content: str = Field(min_length=1)
+    target_filename: str = "target.py"
+    prompt: str = ""
+    reference_files: list[Path] = Field(default_factory=list)
+    provider: ProviderChoice = "auto"
+    agent_name: str = AGENT_NAME
+    timeout: int = Field(default=DEFAULT_TIMEOUT, gt=0)
+    previous_interaction_id: str | None = None
+
+
+class RefactorExecutionResult(BaseModel):
+    """Result data contract for completed refactoring operations."""
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    status: Literal["completed", "failed"] = "completed"
+    provider: ActiveProvider
+    refactored_code: str
+    elapsed_seconds: float = Field(ge=0.0)
+    raw_response: dict[str, JsonValue] = Field(default_factory=dict)
+
+    def __getitem__(self, item: str) -> JsonValue:
+        """Allow dict-style indexing for backwards compatibility."""
+        if hasattr(self, item):
+            val: JsonValue = getattr(self, item)
+            return val
+        raise KeyError(item)
+
+    def get(self, item: str, default: JsonValue | None = None) -> JsonValue | None:
+        return getattr(self, item, default)
+
+
+class BatchReportItem(BaseModel):
+    """Data item representing a single refactor outcome in a batch run."""
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    file: str
+    success: bool
+    output: str | None = None
+
+
+def get_provider_config(provider_override: ProviderChoice = "auto") -> ProviderConfig:
     """
     Resolves the active inference provider, gateway URL, and HTTP auth headers.
-    Returns: (provider_name, gateway_url, headers)
+    Returns: ProviderConfig instance (supports unpacking into a 3-tuple).
     """
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     lr_key = os.getenv("LITEROUTER_AUTH_KEY", "").strip()
@@ -56,7 +234,11 @@ def get_provider_config(provider_override: str = "auto") -> tuple[str, str, dict
             "Content-Type": "application/json",
             "x-goog-api-key": gemini_key,
         }
-        return "gemini", gateway_url, headers
+        return ProviderConfig(
+            provider_name="gemini",
+            gateway_url=gateway_url,
+            headers=headers,
+        )
 
     elif choice == "literouter":
         if not lr_key:
@@ -70,7 +252,11 @@ def get_provider_config(provider_override: str = "auto") -> tuple[str, str, dict
             "Authorization": f"Bearer {lr_key}",
             "x-goog-api-key": lr_key,
         }
-        return "literouter", gateway_url, headers
+        return ProviderConfig(
+            provider_name="literouter",
+            gateway_url=gateway_url,
+            headers=headers,
+        )
 
     else:
         raise ValueError(
@@ -84,7 +270,7 @@ def get_provider_config(provider_override: str = "auto") -> tuple[str, str, dict
         )
 
 
-def extract_output_text(res_json: dict) -> str | None:
+def extract_output_text(res_json: dict[str, JsonValue]) -> str | None:
     """Extracts raw text content from the interaction response."""
     for k in ["output_text", "output", "response", "answer", "result"]:
         v = res_json.get(k)
@@ -94,17 +280,20 @@ def extract_output_text(res_json: dict) -> str | None:
             return str(v.get("text") or v.get("message")).strip()
 
     steps = res_json.get("steps", [])
-    for step in steps:
-        if step.get("type") == "model_output":
-            contents = step.get("content", [])
-            parts = []
-            for c in contents:
-                if isinstance(c, dict) and c.get("text"):
-                    parts.append(c["text"].strip())
-                elif isinstance(c, str) and c.strip():
-                    parts.append(c.strip())
-            if parts:
-                return "\n\n".join(parts)
+    if isinstance(steps, list):
+        for step in steps:
+            if isinstance(step, dict):
+                if step.get("type") == "model_output":
+                    contents = step.get("content", [])
+                    parts = []
+                    if isinstance(contents, list):
+                        for c in contents:
+                            if isinstance(c, dict) and c.get("text"):
+                                parts.append(str(c["text"]).strip())
+                            elif isinstance(c, str) and c.strip():
+                                parts.append(c.strip())
+                    if parts:
+                        return "\n\n".join(parts)
 
     return None
 
@@ -121,7 +310,7 @@ def clean_code_fences(code: str) -> str:
     return code
 
 
-def build_input(prompt: str, target_filename: str, target_code: str, reference_files: list[Path] = None) -> str:
+def build_input(prompt: str, target_filename: str, target_code: str, reference_files: list[Path] | None = None) -> str:
     """Assembles prompt with reference context and target file code."""
     parts = [prompt.strip(), ""]
     parts.append("CRITICAL: Output ONLY the raw, refactored code for the TARGET FILE. Do not include markdown code fences or conversational explanation.")
@@ -147,76 +336,88 @@ def execute_refactor(
     code_content: str,
     target_filename: str = "target.py",
     prompt: str = "",
-    reference_files: list[Path] = None,
-    provider: str = "auto",
+    reference_files: list[Path] | None = None,
+    provider: ProviderChoice = "auto",
     agent_name: str = AGENT_NAME,
     timeout: int = DEFAULT_TIMEOUT,
     previous_interaction_id: str | None = None,
-) -> dict:
+) -> RefactorExecutionResult:
     """
     Core modular function for executing a code refactor.
     Ready for CLI, automated pipelines, or future MCP server tools.
     """
-    provider_name, gateway_url, headers = get_provider_config(provider)
-
     if not prompt:
         if DEFAULT_PROMPT_FILE.exists():
             prompt = DEFAULT_PROMPT_FILE.read_text(encoding="utf-8")
         else:
             prompt = "Refactor this code to clean architecture, idiomatic PEP 8, and add complete type hints."
 
-    user_input = build_input(prompt, target_filename, code_content, reference_files)
+    exec_req = RefactorExecutionRequest(
+        code_content=code_content,
+        target_filename=target_filename,
+        prompt=prompt,
+        reference_files=reference_files or [],
+        provider=provider,
+        agent_name=agent_name,
+        timeout=timeout,
+        previous_interaction_id=previous_interaction_id,
+    )
 
-    payload = {
-        "agent": agent_name,
-        "input": user_input,
-        "environment": "remote",
-    }
-    if previous_interaction_id:
-        payload["previous_interaction_id"] = previous_interaction_id
+    provider_config = get_provider_config(exec_req.provider)
+    user_input = build_input(exec_req.prompt, exec_req.target_filename, exec_req.code_content, exec_req.reference_files)
+
+    interaction_req = InteractionRequest(
+        agent=exec_req.agent_name,
+        input=user_input,
+        environment="remote",
+        previous_interaction_id=exec_req.previous_interaction_id,
+    )
 
     req = urllib.request.Request(
-        gateway_url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
+        provider_config.gateway_url,
+        data=interaction_req.model_dump_json(exclude_none=True).encode("utf-8"),
+        headers=provider_config.headers,
         method="POST",
     )
 
     start_time = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=exec_req.timeout) as resp:
             res_body = resp.read().decode("utf-8")
             res_json = json.loads(res_body)
             elapsed = time.time() - start_time
 
-            raw_code = extract_output_text(res_json)
+            parsed_resp = InteractionResponse.model_validate(res_json)
+            raw_code = parsed_resp.extract_text()
             if raw_code is None:
-                raise RuntimeError(f"Agent did not return output text for {target_filename}")
+                raise RuntimeError(f"Agent did not return output text for {exec_req.target_filename}")
 
             cleaned_code = clean_code_fences(raw_code)
-            return {
-                "status": "completed",
-                "provider": provider_name,
-                "refactored_code": cleaned_code,
-                "elapsed_seconds": round(elapsed, 2),
-                "raw_response": res_json,
-            }
+            return RefactorExecutionResult(
+                status="completed",
+                provider=provider_config.provider_name,
+                refactored_code=cleaned_code,
+                elapsed_seconds=round(elapsed, 2),
+                raw_response=res_json,
+            )
 
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
         elapsed = time.time() - start_time
-        raise RuntimeError(f"HTTP Error {e.code} from {provider_name} ({elapsed:.2f}s): {err_body[:500]}")
+        raise RuntimeError(f"HTTP Error {e.code} from {provider_config.provider_name} ({elapsed:.2f}s): {err_body[:500]}")
     except Exception as e:
+        if isinstance(e, RuntimeError):
+            raise
         elapsed = time.time() - start_time
-        raise RuntimeError(f"Execution Error ({elapsed:.2f}s): {e}")
+        raise RuntimeError(f"Execution Error ({elapsed:.2f}s): {e}") from e
 
 
 def refactor_file(
     file_path: Path,
     output_path: Path | None = None,
     prompt: str = "",
-    reference_files: list[Path] = None,
-    provider: str = "auto",
+    reference_files: list[Path] | None = None,
+    provider: ProviderChoice = "auto",
 ) -> bool:
     """Refactors a single file on disk."""
     if not file_path.exists():
@@ -237,9 +438,9 @@ def refactor_file(
 
         out_file = output_path or file_path.parent / f"{file_path.stem}_refactored{file_path.suffix}"
         out_file.parent.mkdir(parents=True, exist_ok=True)
-        out_file.write_text(result["refactored_code"] + "\n", encoding="utf-8")
+        out_file.write_text(result.refactored_code + "\n", encoding="utf-8")
 
-        print(f"✅ Saved refactored code to: {out_file} ({result['elapsed_seconds']}s)")
+        print(f"✅ Saved refactored code to: {out_file} ({result.elapsed_seconds}s)")
         return True
 
     except Exception as e:
@@ -247,56 +448,65 @@ def refactor_file(
         return False
 
 
-def load_manifest(manifest_path: str) -> dict:
+def load_manifest(manifest_path: str | Path) -> RefactorManifest:
+    """Loads and validates a RefactorManifest from disk."""
     path = Path(manifest_path)
     if not path.exists():
-        print(f"❌ Error: Manifest not found at {path}")
-        sys.exit(1)
+        raise FileNotFoundError(f"Manifest not found at {path}")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        raw_data = json.loads(path.read_text(encoding="utf-8"))
+        return RefactorManifest.model_validate(raw_data)
     except json.JSONDecodeError as e:
-        print(f"❌ Error: Invalid JSON in {path}: {e}")
-        sys.exit(1)
+        raise ValueError(f"Invalid JSON in manifest {path}: {e}") from e
+    except Exception as e:
+        raise ValueError(f"Manifest schema validation failed for {path}: {e}") from e
 
 
-def load_manifests() -> list[dict]:
-    manifests = []
+def load_manifests() -> list[RefactorManifest]:
+    """Loads all valid manifests from the manifests directory."""
+    manifests: list[RefactorManifest] = []
     for f in sorted(MANIFESTS_DIR.glob("*.json")):
         if f.name == "template.json":
             continue
-        manifests.append(load_manifest(str(f)))
+        try:
+            manifests.append(load_manifest(f))
+        except Exception as e:
+            print(f"⚠️ Error loading manifest {f}: {e}", file=sys.stderr)
     return manifests
 
 
-def refactor_with_manifest(manifest: dict, provider: str = "auto", delay: int = 0) -> dict[str, bool]:
+def refactor_with_manifest(
+    manifest: RefactorManifest | dict[str, JsonValue],
+    provider: ProviderChoice = "auto",
+    delay: int = 0,
+) -> dict[str, bool]:
+    """Executes refactoring for all targets in a manifest."""
     if delay > 0:
         time.sleep(delay)
-    prompt = manifest.get("prompt", "")
-    if not prompt:
-        print("❌ Error: Manifest has no 'prompt' field.")
-        return {}
 
-    project_folder = Path(manifest.get("project_folder", str(PROJECT_ROOT)))
+    validated_manifest = (
+        manifest if isinstance(manifest, RefactorManifest) else RefactorManifest.model_validate(manifest)
+    )
+
+    project_folder = Path(validated_manifest.project_folder)
     if not project_folder.is_absolute():
         project_folder = PROJECT_ROOT / project_folder
 
-    targets_raw = manifest.get("targets", [])
-    output_dir = Path(manifest.get("output_dir", str(DEFAULT_OUTPUT_DIR)))
+    output_dir = Path(validated_manifest.output_dir)
     if not output_dir.is_absolute():
         output_dir = PROJECT_ROOT / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_naming = manifest.get("output_naming", "{stem}_refactored")
 
-    reference_files = []
-    for rf in manifest.get("reference_files", []):
+    reference_files: list[Path] = []
+    for rf in validated_manifest.reference_files:
         p = project_folder / rf if not Path(rf).is_absolute() else Path(rf)
         if p.exists():
             reference_files.append(p)
         else:
             print(f"⚠️ Reference file not found: {p}")
 
-    results = {}
-    for target_raw in targets_raw:
+    results: dict[str, bool] = {}
+    for target_raw in validated_manifest.targets:
         target = project_folder / target_raw if not Path(target_raw).is_absolute() else Path(target_raw)
         if not target.exists():
             print(f"❌ Error: Target file not found at {target}")
@@ -309,13 +519,13 @@ def refactor_with_manifest(manifest: dict, provider: str = "auto", delay: int = 
             continue
 
         stem = target.stem
-        output_name = output_naming.replace("{stem}", stem)
+        output_name = validated_manifest.output_naming.replace("{stem}", stem)
         output_file = output_dir / f"{output_name}{target.suffix}"
 
         success = refactor_file(
             file_path=target,
             output_path=output_file,
-            prompt=prompt,
+            prompt=validated_manifest.prompt,
             reference_files=reference_files,
             provider=provider,
         )
@@ -324,28 +534,37 @@ def refactor_with_manifest(manifest: dict, provider: str = "auto", delay: int = 
     return results
 
 
-def generate_batch_report(results: list[dict]) -> Path:
+def generate_batch_report(results: list[BatchReportItem | dict[str, JsonValue]]) -> Path:
+    """Generates a markdown report summarizing a batch refactoring run."""
     report_dir = SCRIPT_DIR / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     report_file = report_dir / f"batch_report_{timestamp}.md"
 
+    validated_items: list[BatchReportItem] = [
+        item if isinstance(item, BatchReportItem) else BatchReportItem.model_validate(item)
+        for item in results
+    ]
+
+    successful_count = sum(1 for r in validated_items if r.success)
+    failed_count = sum(1 for r in validated_items if not r.success)
+
     lines = [
         "# Batch Refactor Report",
         "",
         f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        f"**Total files processed:** {len(results)}",
-        f"**Successful:** {sum(1 for r in results if r['success'])}",
-        f"**Failed:** {sum(1 for r in results if not r['success'])}",
+        f"**Total files processed:** {len(validated_items)}",
+        f"**Successful:** {successful_count}",
+        f"**Failed:** {failed_count}",
         "",
     ]
 
-    for r in results:
-        status = "✅" if r["success"] else "❌"
-        lines.append(f"{status} `{r['file']}`")
-        if r.get("output"):
-            lines.append(f"   → `{r['output']}`")
+    for r in validated_items:
+        status = "✅" if r.success else "❌"
+        lines.append(f"{status} `{r.file}`")
+        if r.output:
+            lines.append(f"   → `{r.output}`")
 
     report_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"\n📊 Batch report saved to: {report_file}")
